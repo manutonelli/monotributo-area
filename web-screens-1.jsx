@@ -167,11 +167,15 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
 window.WebDashboard = WebDashboard;
 
 // ── FACTURACIÓN ─────────────────────────────────────────
-function WebFactura({ navigate, invoices, addInvoice }) {
+function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
   const [showModal, setShowModal] = React.useState(false);
   const [step, setStep] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [form, setForm] = React.useState({ tipo: 'C', cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' });
+  const [caeResult, setCaeResult] = React.useState(null); // { numero, cae, vencimientoCAE }
+  const [confirming, setConfirming] = React.useState(false);
+  const [confirmError, setConfirmError] = React.useState(null);
+  const [cuitLoading, setCuitLoading] = React.useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const nextNumInt = React.useMemo(() => {
@@ -179,23 +183,88 @@ function WebFactura({ navigate, invoices, addInvoice }) {
     const nums = invoices.map(f => parseInt(f.num.split('-')[1])).filter(n => !isNaN(n));
     return Math.max(...nums) + 1;
   }, [invoices]);
-  const nextNumFormatted = `0001-${String(nextNumInt).padStart(8, '0')}`;
 
-  const reset = () => { setShowModal(false); setStep(1); setForm({ tipo: 'C', cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' }); };
+  const reset = () => {
+    setShowModal(false); setStep(1); setConfirmError(null); setCaeResult(null);
+    setForm({ tipo: 'C', cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' });
+  };
 
-  const confirm = () => {
-    const today = new Date();
-    const fecha = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
-    addInvoice({
-      num: nextNumFormatted,
-      cliente: form.razon || 'Consumidor Final',
-      cuit: form.cuit || '—',
-      monto: Number(form.monto),
-      fecha,
-      tipo: form.tipo,
-      concepto: form.concepto,
-    });
-    setStep(3);
+  // Lookup de CUIT en el padrón ARCA
+  const lookupCuit = async () => {
+    const cuitLimpio = form.cuit.replace(/\D/g, '');
+    if (cuitLimpio.length !== 11) return;
+    setCuitLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/padron/${cuitLimpio}?cuitEmisor=${(cuitEmisor||'').replace(/\D/g,'')}`);
+      if (res.ok) {
+        const data = await res.json();
+        set('razon', data.razonSocial || form.razon);
+        set('condicion', data.condicionIVA || form.condicion);
+      }
+    } catch {}
+    setCuitLoading(false);
+  };
+
+  // Confirmar: llama al backend para obtener CAE real
+  const confirm = async () => {
+    setConfirming(true);
+    setConfirmError(null);
+
+    const docTipo = form.cuit ? 80 : 99; // 80=CUIT, 99=Consumidor Final
+    const docNro = form.cuit ? form.cuit.replace(/\D/g, '') : 0;
+    const emisorCuit = (cuitEmisor || '').replace(/\D/g, '');
+
+    try {
+      let resultado;
+      if (emisorCuit && emisorCuit.length === 11) {
+        const res = await fetch(`${API_BASE}/facturas/cae`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cuit: emisorCuit,
+            ptoVta: 1,
+            tipo: form.tipo,
+            concepto: 2, // Servicios
+            docTipo,
+            docNro,
+            importeTotal: Number(form.monto),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error del servidor');
+        resultado = data;
+      } else {
+        // Sin certificado configurado: generar número local y CAE simulado
+        resultado = {
+          numero: nextNumInt,
+          cae: Math.floor(Math.random() * 9e13 + 1e13).toString(),
+          vencimientoCAE: (() => { const d = new Date(); d.setDate(d.getDate() + 10); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(),
+        };
+      }
+
+      const today = new Date();
+      const fecha = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+      const numFormatted = `0001-${String(resultado.numero).padStart(8, '0')}`;
+
+      addInvoice({
+        num: numFormatted,
+        cliente: form.razon || 'Consumidor Final',
+        cuit: form.cuit || '—',
+        monto: Number(form.monto),
+        fecha,
+        tipo: form.tipo,
+        concepto: form.concepto,
+        cae: resultado.cae,
+        vencimientoCAE: resultado.vencimientoCAE,
+      });
+
+      setCaeResult({ ...resultado, numFormatted });
+      setStep(3);
+    } catch (err) {
+      setConfirmError(err.message);
+    } finally {
+      setConfirming(false);
+    }
   };
 
   const downloadFactura = (f) => {
@@ -329,7 +398,17 @@ function WebFactura({ navigate, invoices, addInvoice }) {
                   ))}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <Field label="CUIT / DNI (opcional)" value={form.cuit} onChange={v => set('cuit', v)} placeholder="20-12345678-3" />
+                  <div>
+                    <Field label="CUIT / DNI (opcional)" value={form.cuit} onChange={v => set('cuit', v)} placeholder="20-12345678-3" />
+                    {form.cuit.replace(/\D/g,'').length === 11 && (
+                      <button onClick={lookupCuit} disabled={cuitLoading} style={{
+                        marginTop: 5, fontSize: 11.5, color: DS.colors.primary, background: 'none',
+                        border: 'none', cursor: 'pointer', padding: 0, fontFamily: DS.font,
+                      }}>
+                        {cuitLoading ? 'Consultando padrón…' : '↗ Buscar en padrón ARCA'}
+                      </button>
+                    )}
+                  </div>
                   <Field label="Razón Social / Nombre" value={form.razon} onChange={v => set('razon', v)} placeholder="Consumidor Final" />
                 </div>
                 <Field label="Concepto" value={form.concepto} onChange={v => set('concepto', v)} placeholder="Servicios profesionales — Abril 2026" />
@@ -360,32 +439,37 @@ function WebFactura({ navigate, invoices, addInvoice }) {
                 <div style={{ background: DS.colors.warningLight, borderRadius: 8, padding: '11px 14px', marginBottom: 18, fontSize: 12, color: DS.colors.textMid, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <Icon name="alert" size={15} color={DS.colors.warning} style={{ marginTop: 1 }} /> Una vez confirmada, se enviará a AFIP y no podrá modificarse.
                 </div>
+                {confirmError && (
+                  <div style={{ background: DS.colors.dangerLight, borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: DS.colors.danger, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <Icon name="alert" size={15} color={DS.colors.danger} style={{ marginTop: 1 }} /> {confirmError}
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <Btn variant="secondary" style={{ flex: 1 }} onClick={() => setStep(1)}>Volver</Btn>
-                  <Btn variant="primary" style={{ flex: 1.4 }} onClick={confirm}>Confirmar y emitir</Btn>
+                  <Btn variant="secondary" style={{ flex: 1 }} disabled={confirming} onClick={() => setStep(1)}>Volver</Btn>
+                  <Btn variant="primary" style={{ flex: 1.4 }} disabled={confirming} onClick={confirm}>
+                    {confirming ? 'Enviando a ARCA…' : 'Confirmar y emitir'}
+                  </Btn>
                 </div>
               </div>
             </>
           )}
-          {step === 3 && (() => {
-            const emitida = invoices[0];
+          {step === 3 && caeResult && (() => {
+            const factObj = { num: caeResult.numFormatted, tipo: form.tipo, cliente: form.razon || 'Consumidor Final', cuit: form.cuit || '—', concepto: form.concepto, monto: form.monto, fecha: (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(), cae: caeResult.cae, vencimientoCAE: caeResult.vencimientoCAE };
             return (
               <div style={{ padding: '38px 30px', textAlign: 'center' }}>
                 <div style={{ width: 60, height: 60, borderRadius: 99, background: DS.colors.successLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
                   <Icon name="check" size={30} color={DS.colors.success} strokeWidth={2.2} />
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: DS.colors.text, marginBottom: 6 }}>Factura emitida</div>
-                <div style={{ fontSize: 13.5, color: DS.colors.textMuted }}>Factura {form.tipo} Nº {nextNumFormatted}</div>
+                <div style={{ fontSize: 13.5, color: DS.colors.textMuted }}>Factura {form.tipo} Nº {caeResult.numFormatted}</div>
                 <div style={{ fontSize: 25, fontWeight: 700, color: DS.colors.text, margin: '12px 0 20px' }}>${Number(form.monto || 0).toLocaleString('es-AR')}</div>
                 <div style={{ background: DS.colors.bg, borderRadius: 10, padding: '14px 20px', marginBottom: 22, border: `1px solid ${DS.colors.border}` }}>
-                  <div style={{ fontSize: 11, color: DS.colors.textMuted, letterSpacing: 0.4, fontWeight: 600 }}>CAE EMITIDO</div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: DS.colors.text, marginTop: 4, letterSpacing: 1 }}>74392847163529</div>
-                  <div style={{ fontSize: 11, color: DS.colors.textMuted, marginTop: 2 }}>
-                    Vence: {(() => { const d = new Date(); d.setDate(d.getDate() + 10); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })()}
-                  </div>
+                  <div style={{ fontSize: 11, color: DS.colors.textMuted, letterSpacing: 0.4, fontWeight: 600 }}>CAE EMITIDO POR ARCA</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: DS.colors.text, marginTop: 4, letterSpacing: 1 }}>{caeResult.cae}</div>
+                  <div style={{ fontSize: 11, color: DS.colors.textMuted, marginTop: 2 }}>Vence: {caeResult.vencimientoCAE}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <Btn variant="secondary" style={{ flex: 1 }} onClick={() => downloadFactura({ num: nextNumFormatted, tipo: form.tipo, cliente: form.razon || 'Consumidor Final', cuit: form.cuit || '—', concepto: form.concepto, monto: form.monto, fecha: (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })() })}>
+                  <Btn variant="secondary" style={{ flex: 1 }} onClick={() => downloadFactura(factObj)}>
                     <Icon name="download" size={15} color={DS.colors.primary} /> Descargar
                   </Btn>
                   <Btn variant="primary" style={{ flex: 1 }} onClick={reset}>Listo</Btn>

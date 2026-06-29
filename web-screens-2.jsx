@@ -417,10 +417,49 @@ function WebDerivar({ navigate, estudio }) {
 window.WebDerivar = WebDerivar;
 
 // ── PERFIL ──────────────────────────────────────────────
-function WebPerfil({ navigate, userName, categoria, estudio }) {
+function WebPerfil({ navigate, userName, cuit, categoria, estudio }) {
   const [notif, setNotif] = React.useState(true);
   const [bio, setBio] = React.useState(false);
   const [email, setEmail] = React.useState(true);
+
+  // Certificado ARCA
+  const [certStatus, setCertStatus] = React.useState(null); // null=loading, {}=loaded
+  const [certFile, setCertFile] = React.useState(null);
+  const [certPass, setCertPass] = React.useState('');
+  const [certUploading, setCertUploading] = React.useState(false);
+  const [certError, setCertError] = React.useState(null);
+  const [certSuccess, setCertSuccess] = React.useState(null);
+  const [showCertForm, setShowCertForm] = React.useState(false);
+
+  const cuitNum = (cuit || '').replace(/\D/g, '');
+
+  React.useEffect(() => {
+    if (!cuitNum) return;
+    fetch(`${API_BASE}/cert/status/${cuitNum}`)
+      .then(r => r.json())
+      .then(d => setCertStatus(d))
+      .catch(() => setCertStatus({ active: false }));
+  }, [cuitNum]);
+
+  const uploadCert = async () => {
+    if (!certFile || !cuitNum) return;
+    setCertUploading(true); setCertError(null); setCertSuccess(null);
+    const fd = new FormData();
+    fd.append('cert', certFile);
+    fd.append('password', certPass);
+    fd.append('cuit', cuitNum);
+    try {
+      const res = await fetch(`${API_BASE}/cert/upload`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCertStatus({ active: true, cn: data.cn, vencimiento: data.vencimiento, vencido: false });
+      setCertSuccess(`Certificado cargado correctamente (vence ${data.vencimiento})`);
+      setShowCertForm(false); setCertFile(null); setCertPass('');
+    } catch (err) {
+      setCertError(err.message);
+    }
+    setCertUploading(false);
+  };
 
   const Toggle = ({ val, set }) => (
     <div onClick={() => set(!val)} style={{
@@ -449,7 +488,7 @@ function WebPerfil({ navigate, userName, categoria, estudio }) {
 
           <WebSection>Datos fiscales</WebSection>
           <Card>
-            {[['CUIT', '27-34567890-1'], ['Inicio de actividad', '15/03/2019'], ['Actividad', 'Servicios profesionales'], ['Domicilio fiscal', 'Av. Corrientes 1234, CABA'], ['Obra social', 'OSDE — Plan 210']].map(([k, v], i, arr) => (
+            {[['CUIT', cuit || '27-34567890-1'], ['Inicio de actividad', '15/03/2019'], ['Actividad', 'Servicios profesionales'], ['Domicilio fiscal', 'Av. Corrientes 1234, CABA'], ['Obra social', 'OSDE — Plan 210']].map(([k, v], i, arr) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: i < arr.length - 1 ? `1px solid ${DS.colors.border}` : 'none' }}>
                 <span style={{ fontSize: 13, color: DS.colors.textMuted }}>{k}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.text }}>{v}</span>
@@ -459,6 +498,85 @@ function WebPerfil({ navigate, userName, categoria, estudio }) {
         </div>
 
         <div>
+          <WebSection>Certificado ARCA</WebSection>
+          <Card style={{ marginBottom: 20 }}>
+            {certStatus === null ? (
+              <div style={{ fontSize: 13, color: DS.colors.textMuted, padding: '8px 0' }}>Verificando certificado…</div>
+            ) : certStatus.active ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <Icon name="shield" size={18} color={certStatus.vencido ? DS.colors.danger : DS.colors.success} />
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: DS.colors.text }}>
+                        {certStatus.vencido ? 'Certificado vencido' : 'Certificado activo'}
+                      </div>
+                      <div style={{ fontSize: 12, color: DS.colors.textMuted }}>{certStatus.cn}</div>
+                    </div>
+                  </div>
+                  <Badge
+                    color={certStatus.vencido ? DS.colors.dangerLight : DS.colors.successLight}
+                    textColor={certStatus.vencido ? DS.colors.danger : DS.colors.success}
+                  >
+                    {certStatus.vencido ? 'Vencido' : `Válido hasta ${certStatus.vencimiento}`}
+                  </Badge>
+                </div>
+                {certSuccess && <div style={{ fontSize: 12, color: DS.colors.success, marginBottom: 8 }}>{certSuccess}</div>}
+                <Btn variant="outline" style={{ width: '100%' }} onClick={() => { setShowCertForm(true); setCertError(null); }}>
+                  <Icon name="refresh" size={14} color={DS.colors.primary} /> Renovar certificado
+                </Btn>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                  <Icon name="alert" size={18} color={DS.colors.warning} />
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: DS.colors.text }}>Sin certificado</div>
+                    <div style={{ fontSize: 12, color: DS.colors.textMuted }}>Necesitás subir tu certificado ARCA para emitir facturas reales</div>
+                  </div>
+                </div>
+                {certSuccess && <div style={{ fontSize: 12, color: DS.colors.success, marginBottom: 8 }}>{certSuccess}</div>}
+                <Btn variant="primary" style={{ width: '100%' }} onClick={() => { setShowCertForm(true); setCertError(null); }}>
+                  <Icon name="plus" size={14} color="#fff" /> Subir certificado .p12
+                </Btn>
+              </div>
+            )}
+
+            {showCertForm && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${DS.colors.border}` }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: DS.colors.textMid, marginBottom: 10 }}>
+                  Certificado digital (.p12) emitido por ARCA para CUIT {cuit}
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: DS.colors.textMid, marginBottom: 5 }}>ARCHIVO .P12</div>
+                  <input
+                    type="file" accept=".p12,.pfx"
+                    onChange={e => setCertFile(e.target.files[0])}
+                    style={{ fontSize: 12.5, fontFamily: DS.font, width: '100%' }}
+                  />
+                </div>
+                <Field
+                  label="CONTRASEÑA DEL CERTIFICADO"
+                  value={certPass}
+                  onChange={v => setCertPass(v)}
+                  placeholder="Contraseña del .p12"
+                  type="password"
+                />
+                {certError && (
+                  <div style={{ fontSize: 12.5, color: DS.colors.danger, marginBottom: 8, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                    <Icon name="alert" size={13} color={DS.colors.danger} style={{ marginTop: 2 }} /> {certError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <Btn variant="secondary" style={{ flex: 1 }} onClick={() => { setShowCertForm(false); setCertError(null); }}>Cancelar</Btn>
+                  <Btn variant="primary" style={{ flex: 1 }} disabled={!certFile || certUploading} onClick={uploadCert}>
+                    {certUploading ? 'Procesando…' : 'Guardar certificado'}
+                  </Btn>
+                </div>
+              </div>
+            )}
+          </Card>
+
           <WebSection>Estudio contable</WebSection>
           <Card style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingBottom: 12, borderBottom: `1px solid ${DS.colors.border}`, marginBottom: 12 }}>
