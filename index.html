@@ -44,8 +44,12 @@
 </template>
 
 <script type="text/babel">
+// URL del backend — cambiar a la URL de producción cuando se despliegue
+const API_BASE = 'http://localhost:3001/api';
+
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "userName": "María García",
+  "cuit": "27-34567890-1",
   "categoria": "C",
   "estudio": "Estudio Contable XYZ"
 }/*EDITMODE-END*/;
@@ -83,14 +87,14 @@ function App() {
   const [screen, setScreen] = React.useState('dashboard');
   const [invoices, setInvoices] = React.useState(INITIAL_FACTURAS);
   const navigate = (to) => setScreen(to);
-  const { userName, categoria, estudio } = tweaks;
+  const { userName, cuit, categoria, estudio } = tweaks;
   const meta = SCREEN_META[screen] || SCREEN_META.dashboard;
 
   const addInvoice = React.useCallback((inv) => setInvoices(prev => [inv, ...prev]), []);
   const onCategoriaChange = React.useCallback((cat) => setTweak('categoria', cat), [setTweak]);
 
   const renderScreen = () => {
-    const p = { navigate, userName, categoria, estudio, invoices, addInvoice, onCategoriaChange };
+    const p = { navigate, userName, cuit, categoria, estudio, invoices, addInvoice, onCategoriaChange };
     switch (screen) {
       case 'dashboard':        return <WebDashboard {...p} />;
       case 'factura':          return <WebFactura {...p} />;
@@ -120,6 +124,7 @@ function App() {
       <TweaksPanel tweaks={tweaks} setTweak={setTweak}>
         <TweakSection title="Contribuyente">
           <TweakText id="userName" label="Nombre" value={tweaks.userName} onChange={v => setTweak('userName', v)} />
+          <TweakText id="cuit" label="CUIT" value={tweaks.cuit} onChange={v => setTweak('cuit', v)} />
           <TweakSelect id="categoria" label="Categoría" value={tweaks.categoria}
             options={['A','B','C','D','E','F','G'].map(c => ({ label: `Categoría ${c}`, value: c }))}
             onChange={v => setTweak('categoria', v)} />
