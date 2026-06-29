@@ -93,9 +93,10 @@ function WebVencimientos({ navigate }) {
 window.WebVencimientos = WebVencimientos;
 
 // ── TOPES ───────────────────────────────────────────────
-function WebTopes({ navigate, categoria }) {
-  const facturado = 2840000;
-  const tope = 5251580;
+function WebTopes({ navigate, categoria, invoices }) {
+  const TOPES_CAT = { A: 2109906, B: 3150950, C: 4201265, D: 5251580, E: 6302896, F: 7878620, G: 9454344 };
+  const facturado = (invoices || []).reduce((sum, f) => sum + f.monto, 0);
+  const tope = TOPES_CAT[categoria] || 5251580;
   const categorias = [
     { cat: 'A', tope: 2109906 }, { cat: 'B', tope: 3150950 }, { cat: 'C', tope: 4201265 },
     { cat: 'D', tope: 5251580 }, { cat: 'E', tope: 6302896 }, { cat: 'F', tope: 7878620 }, { cat: 'G', tope: 9454344 },
@@ -189,14 +190,21 @@ function WebTopes({ navigate, categoria }) {
 window.WebTopes = WebTopes;
 
 // ── RECATEGORIZACIÓN ────────────────────────────────────
-function WebRecategorizacion({ navigate, categoria }) {
+function WebRecategorizacion({ navigate, categoria, onCategoriaChange, invoices }) {
   const [step, setStep] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const run = () => { setLoading(true); setTimeout(() => { setLoading(false); setStep(1); }, 1600); };
 
+  const TOPES_CAT = { A: 2109906, B: 3150950, C: 4201265, D: 5251580, E: 6302896, F: 7878620, G: 9454344 };
+  const facturado = (invoices || []).reduce((sum, f) => sum + f.monto, 0);
+  const proyeccionAnual = facturado * 2;
+  const catActualTope = TOPES_CAT[categoria] || 5251580;
+  const catSugeridaKey = Object.keys(TOPES_CAT).find(k => TOPES_CAT[k] > proyeccionAnual) || 'G';
+  const catSugerida = catSugeridaKey === categoria ? categoria : catSugeridaKey;
+
   const params = [
-    { label: 'Facturación semestral', valor: '$2.840.000', ok: true },
-    { label: 'Proyección anual', valor: '$5.680.000', ok: false },
+    { label: 'Facturación semestral', valor: `$${facturado.toLocaleString('es-AR')}`, ok: facturado <= catActualTope / 2 },
+    { label: 'Proyección anual', valor: `$${proyeccionAnual.toLocaleString('es-AR')}`, ok: proyeccionAnual <= catActualTope },
     { label: 'Energía eléctrica consumida', valor: '1.200 kWh/año', ok: true },
     { label: 'Superficie afectada', valor: '0 m²', ok: true },
     { label: 'Personal en relación de dependencia', valor: '0', ok: true },
@@ -210,7 +218,7 @@ function WebRecategorizacion({ navigate, categoria }) {
         </div>
         <div style={{ fontSize: 20, fontWeight: 700, color: DS.colors.text, marginBottom: 8 }}>Recategorización iniciada</div>
         <div style={{ fontSize: 13.5, color: DS.colors.textMid, lineHeight: 1.6, marginBottom: 22 }}>
-          Tu solicitud de cambio a <strong>Categoría E</strong> fue registrada en AFIP. El nuevo importe rige desde el 1/07/2026.
+          Tu solicitud de cambio a <strong>Categoría {catSugerida}</strong> fue registrada en AFIP. El nuevo importe rige desde el 1/07/2026.
         </div>
         <div style={{ background: DS.colors.bg, borderRadius: 10, padding: '16px 20px', marginBottom: 24, border: `1px solid ${DS.colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: DS.colors.textMuted }}>Nueva cuota mensual</span>
@@ -251,10 +259,16 @@ function WebRecategorizacion({ navigate, categoria }) {
         <>
           <Card style={{ marginBottom: 20, borderLeft: `3px solid ${DS.colors.warning}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 18 }}>
-              <Icon name="refresh" size={22} color={DS.colors.warning} />
+              <Icon name="refresh" size={22} color={catSugerida !== categoria ? DS.colors.warning : DS.colors.success} />
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: DS.colors.text }}>Se recomienda recategorizar</div>
-                <div style={{ fontSize: 12.5, color: DS.colors.textMuted }}>Tu proyección anual supera el tope de Categoría {categoria}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: DS.colors.text }}>
+                  {catSugerida !== categoria ? 'Se recomienda recategorizar' : 'Categoría correcta'}
+                </div>
+                <div style={{ fontSize: 12.5, color: DS.colors.textMuted }}>
+                  {catSugerida !== categoria
+                    ? `Tu proyección anual supera el tope de Categoría ${categoria}`
+                    : `Tu facturación está dentro de los límites de Categoría ${categoria}`}
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
@@ -266,7 +280,7 @@ function WebRecategorizacion({ navigate, categoria }) {
               <Icon name="arrowRight" size={22} color={DS.colors.textMuted} />
               <div style={{ flex: 1, textAlign: 'center', background: DS.colors.primary, borderRadius: 9, padding: '14px 8px' }}>
                 <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>SUGERIDA</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginTop: 2 }}>Cat. E</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginTop: 2 }}>Cat. {catSugerida}</div>
                 <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>$52.340/mes</div>
               </div>
             </div>
@@ -287,7 +301,9 @@ function WebRecategorizacion({ navigate, categoria }) {
 
           <div style={{ display: 'flex', gap: 12 }}>
             <Btn variant="outline" style={{ flex: 1 }} onClick={() => navigate('derivar')}>Consultar contador</Btn>
-            <Btn variant="primary" style={{ flex: 1 }} onClick={() => setStep(2)}>Recategorizarme a Cat. E</Btn>
+            <Btn variant="primary" style={{ flex: 1 }} onClick={() => { if (onCategoriaChange && catSugerida !== categoria) onCategoriaChange(catSugerida); setStep(2); }}>
+              Recategorizarme a Cat. {catSugerida}
+            </Btn>
           </div>
         </>
       )}

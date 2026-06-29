@@ -1,12 +1,34 @@
 
-// MonoClaro Web — Screens part 1: Dashboard, Facturación, VEP (sober)
+// MonoClaro Web — Screens part 1: Dashboard, Facturación, VEP
 // ===================================================================
 
 // ── DASHBOARD ───────────────────────────────────────────
-function WebDashboard({ navigate, userName, categoria }) {
-  const facturado = 2840000;
-  const tope = 5251580;
-  const pct = Math.round((facturado / tope) * 100);
+function WebDashboard({ navigate, userName, categoria, invoices }) {
+  const TOPES_CAT = { A: 2109906, B: 3150950, C: 4201265, D: 5251580, E: 6302896, F: 7878620, G: 9454344 };
+  const tope = TOPES_CAT[categoria] || 5251580;
+  const facturado = invoices.reduce((sum, f) => sum + f.monto, 0);
+  const pct = Math.min(100, Math.round((facturado / tope) * 100));
+
+  const now = new Date();
+  const facturasMes = invoices.filter(f => {
+    const [, m, y] = f.fecha.split('/');
+    return parseInt(m) === now.getMonth() + 1 && parseInt(y) === now.getFullYear();
+  });
+  const totalMes = facturasMes.reduce((s, f) => s + f.monto, 0);
+
+  const fmt = (n) => n >= 1000000 ? `$${(n / 1000000).toFixed(2)}M` : `$${(n / 1000).toFixed(0)}K`;
+
+  const recentInvoices = invoices.slice(0, 4).map(f => ({
+    ...f,
+    fechaLabel: (() => {
+      const [d, m, y] = f.fecha.split('/');
+      const fd = new Date(y, m - 1, d);
+      const diff = Math.round((now - fd) / 86400000);
+      if (diff === 0) return 'Hoy';
+      if (diff === 1) return 'Ayer';
+      return `${d} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m)-1]}`;
+    })(),
+  }));
 
   return (
     <WebContent>
@@ -27,9 +49,9 @@ function WebDashboard({ navigate, userName, categoria }) {
 
       {/* Stat tiles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 26 }}>
-        <StatTile label="FACTURADO 2026" value="$2.84M" sub={`${pct}% del tope anual`} icon="dollar" accent={DS.colors.primary} trend={{ up: true, value: '12%' }} />
+        <StatTile label="FACTURADO 2026" value={fmt(facturado)} sub={`${pct}% del tope anual`} icon="dollar" accent={DS.colors.primary} trend={{ up: true, value: '12%' }} />
         <StatTile label="CATEGORÍA ACTUAL" value={`Cat. ${categoria}`} sub="Cuota $42.830 / mes" icon="fileText" accent={DS.colors.accent} />
-        <StatTile label="FACTURAS DEL MES" value="14" sub="$1.21M emitido en mayo" icon="invoice" accent={DS.colors.success} trend={{ up: true, value: '3' }} />
+        <StatTile label="FACTURAS DEL MES" value={facturasMes.length} sub={`${fmt(totalMes)} emitido`} icon="invoice" accent={DS.colors.success} />
         <StatTile label="PRÓXIMO PAGO" value="20 May" sub="Quedan 5 días" icon="clock" accent={DS.colors.warning} />
       </div>
 
@@ -61,13 +83,8 @@ function WebDashboard({ navigate, userName, categoria }) {
           {/* Recent invoices */}
           <WebSection action="Ver todas" onAction={() => navigate('factura')}>Últimas facturas</WebSection>
           <Card style={{ padding: '2px 18px' }}>
-            {[
-              { num: '0001-00000124', cliente: 'Tech Solutions S.A.', monto: '$185.000', fecha: 'Hoy, 14:32' },
-              { num: '0001-00000123', cliente: 'Consultora ABC S.R.L.', monto: '$320.000', fecha: 'Ayer, 09:15' },
-              { num: '0001-00000122', cliente: 'García & Asociados', monto: '$95.000', fecha: '22 abr' },
-              { num: '0001-00000121', cliente: 'Estudio Creativo', monto: '$210.000', fecha: '18 abr' },
-            ].map((f, i, arr) => (
-              <div key={i} style={{
+            {recentInvoices.map((f, i, arr) => (
+              <div key={f.num} style={{
                 display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0',
                 borderBottom: i < arr.length - 1 ? `1px solid ${DS.colors.border}` : 'none',
               }}>
@@ -77,11 +94,11 @@ function WebDashboard({ navigate, userName, categoria }) {
                 }}><Icon name="invoice" size={16} color={DS.colors.textMid} /></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: DS.colors.text }}>{f.cliente}</div>
-                  <div style={{ fontSize: 12, color: DS.colors.textMuted }}>FC C {f.num}</div>
+                  <div style={{ fontSize: 12, color: DS.colors.textMuted }}>FC {f.tipo} {f.num}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: DS.colors.text }}>{f.monto}</div>
-                  <div style={{ fontSize: 11, color: DS.colors.textMuted }}>{f.fecha}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: DS.colors.text }}>${f.monto.toLocaleString('es-AR')}</div>
+                  <div style={{ fontSize: 11, color: DS.colors.textMuted }}>{f.fechaLabel}</div>
                 </div>
               </div>
             ))}
@@ -121,7 +138,7 @@ function WebDashboard({ navigate, userName, categoria }) {
             {[
               { dia: '20', mes: 'MAY', tipo: 'Monotributo', desc: 'Pago mensual', proximo: true },
               { dia: '30', mes: 'JUN', tipo: 'Recategorización', desc: 'Semestral obligatoria', proximo: false },
-              { dia: '05', mes: 'JUL', tipo: 'Monotributo', desc: 'Pago mensual', proximo: false },
+              { dia: '20', mes: 'JUL', tipo: 'Monotributo', desc: 'Pago mensual', proximo: false },
             ].map((v, i, arr) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 13, padding: '13px 0',
@@ -150,21 +167,79 @@ function WebDashboard({ navigate, userName, categoria }) {
 window.WebDashboard = WebDashboard;
 
 // ── FACTURACIÓN ─────────────────────────────────────────
-function WebFactura({ navigate }) {
+function WebFactura({ navigate, invoices, addInvoice }) {
   const [showModal, setShowModal] = React.useState(false);
   const [step, setStep] = React.useState(1);
+  const [search, setSearch] = React.useState('');
   const [form, setForm] = React.useState({ tipo: 'C', cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const nextNumInt = React.useMemo(() => {
+    if (!invoices.length) return 125;
+    const nums = invoices.map(f => parseInt(f.num.split('-')[1])).filter(n => !isNaN(n));
+    return Math.max(...nums) + 1;
+  }, [invoices]);
+  const nextNumFormatted = `0001-${String(nextNumInt).padStart(8, '0')}`;
+
   const reset = () => { setShowModal(false); setStep(1); setForm({ tipo: 'C', cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' }); };
 
-  const facturas = [
-    { num: '0001-00000124', cliente: 'Tech Solutions S.A.', cuit: '30-71234567-8', monto: 185000, fecha: '29/04/2026' },
-    { num: '0001-00000123', cliente: 'Consultora ABC S.R.L.', cuit: '30-69876543-2', monto: 320000, fecha: '28/04/2026' },
-    { num: '0001-00000122', cliente: 'García & Asociados', cuit: '27-34567890-1', monto: 95000, fecha: '22/04/2026' },
-    { num: '0001-00000121', cliente: 'Estudio Creativo', cuit: '30-71112223-3', monto: 210000, fecha: '18/04/2026' },
-    { num: '0001-00000120', cliente: 'Consumidor Final', cuit: '—', monto: 45000, fecha: '15/04/2026' },
-    { num: '0001-00000119', cliente: 'Marketing Digital S.A.', cuit: '30-70009998-7', monto: 280000, fecha: '10/04/2026' },
-  ];
+  const confirm = () => {
+    const today = new Date();
+    const fecha = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+    addInvoice({
+      num: nextNumFormatted,
+      cliente: form.razon || 'Consumidor Final',
+      cuit: form.cuit || '—',
+      monto: Number(form.monto),
+      fecha,
+      tipo: form.tipo,
+      concepto: form.concepto,
+    });
+    setStep(3);
+  };
+
+  const downloadFactura = (f) => {
+    const lines = [
+      `FACTURA ${f.tipo || 'C'} Nº ${f.num}`,
+      '='.repeat(50),
+      `Fecha: ${f.fecha}`,
+      `Cliente: ${f.cliente}`,
+      `CUIT: ${f.cuit}`,
+      `Concepto: ${f.concepto || 'Servicios profesionales'}`,
+      `Condición IVA: Monotributo — No genera crédito fiscal`,
+      '='.repeat(50),
+      `TOTAL: $${Number(f.monto).toLocaleString('es-AR')}`,
+      '',
+      `CAE: 74392847163529`,
+      `Vence CAE: ${(() => { const d = new Date(); d.setDate(d.getDate() + 10); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })()}`,
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `factura-${f.num}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const filtered = search.trim()
+    ? invoices.filter(f =>
+        f.cliente.toLowerCase().includes(search.toLowerCase()) ||
+        f.num.includes(search) ||
+        (f.cuit && f.cuit.includes(search)) ||
+        (f.concepto && f.concepto.toLowerCase().includes(search.toLowerCase()))
+      )
+    : invoices;
+
+  const now = new Date();
+  const facturasMes = invoices.filter(f => {
+    const [, m, y] = f.fecha.split('/');
+    return parseInt(m) === now.getMonth() + 1 && parseInt(y) === now.getFullYear();
+  });
+  const totalMes = facturasMes.reduce((s, f) => s + f.monto, 0);
+  const promedio = invoices.length > 0 ? Math.round(invoices.reduce((s, f) => s + f.monto, 0) / invoices.length) : 0;
 
   const columns = [
     { key: 'num', label: 'Comprobante', width: '1.3fr' },
@@ -176,28 +251,63 @@ function WebFactura({ navigate }) {
   ];
 
   const renderCell = (row, key) => {
-    if (key === 'num') return <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.primaryMid }}>FC C {row.num}</span>;
+    if (key === 'num') return <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.primaryMid }}>FC {row.tipo || 'C'} {row.num}</span>;
     if (key === 'cliente') return <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.text }}>{row.cliente}</span>;
     if (key === 'cuit') return <span style={{ fontSize: 13, color: DS.colors.textMid }}>{row.cuit}</span>;
     if (key === 'fecha') return <span style={{ fontSize: 13, color: DS.colors.textMid }}>{row.fecha}</span>;
     if (key === 'monto') return <span style={{ fontSize: 13.5, fontWeight: 700, color: DS.colors.text }}>${row.monto.toLocaleString('es-AR')}</span>;
-    if (key === 'estado') return <Badge color={DS.colors.successLight} textColor={DS.colors.success}>Emitida</Badge>;
+    if (key === 'estado') return (
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, alignItems: 'center' }}>
+        <Badge color={DS.colors.successLight} textColor={DS.colors.success}>Emitida</Badge>
+        <div
+          onClick={() => downloadFactura(row)}
+          title="Descargar"
+          style={{ cursor: 'pointer', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}
+          onMouseEnter={e => e.currentTarget.style.background = DS.colors.bg}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <Icon name="download" size={14} color={DS.colors.textMuted} />
+        </div>
+      </div>
+    );
   };
 
   return (
     <WebContent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
-        <StatTile label="EMITIDO ESTE MES" value="$1.21M" sub="14 comprobantes" icon="trending" accent={DS.colors.success} />
-        <StatTile label="PROMEDIO POR FACTURA" value="$86.4K" sub="+8% vs mes anterior" icon="chart" accent={DS.colors.primary} />
-        <StatTile label="ÚLTIMO COMPROBANTE" value="Nº 124" sub="Hace 2 horas" icon="invoice" accent={DS.colors.accent} />
+        <StatTile label="EMITIDO ESTE MES" value={totalMes >= 1000000 ? `$${(totalMes/1000000).toFixed(2)}M` : `$${(totalMes/1000).toFixed(0)}K`} sub={`${facturasMes.length} comprobantes`} icon="trending" accent={DS.colors.success} />
+        <StatTile label="PROMEDIO POR FACTURA" value={`$${(promedio/1000).toFixed(1)}K`} sub="Promedio histórico" icon="chart" accent={DS.colors.primary} />
+        <StatTile label="ÚLTIMO COMPROBANTE" value={`Nº ${nextNumInt - 1}`} sub={invoices[0] ? `Emitido el ${invoices[0].fecha}` : '—'} icon="invoice" accent={DS.colors.accent} />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 }}>
         <WebSection style={{ margin: 0 }}>Historial de facturas</WebSection>
-        <Btn variant="primary" onClick={() => setShowModal(true)}><Icon name="plus" size={16} color="#fff" /> Nueva factura</Btn>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <Icon name="search" size={15} color={DS.colors.textMuted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar cliente, N° o concepto…"
+              style={{
+                paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+                borderRadius: 8, border: `1.5px solid ${DS.colors.border}`, fontSize: 13,
+                fontFamily: DS.font, color: DS.colors.text, outline: 'none', width: 240,
+                background: DS.colors.card,
+              }}
+            />
+          </div>
+          <Btn variant="primary" onClick={() => setShowModal(true)}><Icon name="plus" size={16} color="#fff" /> Nueva factura</Btn>
+        </div>
       </div>
 
-      <DataTable columns={columns} rows={facturas} renderCell={renderCell} />
+      {filtered.length === 0 && search ? (
+        <Card style={{ textAlign: 'center', padding: '32px', color: DS.colors.textMuted, fontSize: 13.5 }}>
+          Sin resultados para "<strong>{search}</strong>"
+        </Card>
+      ) : (
+        <DataTable columns={columns} rows={filtered} renderCell={renderCell} />
+      )}
 
       {showModal && (
         <Modal onClose={reset} width={520}>
@@ -236,7 +346,7 @@ function WebFactura({ navigate }) {
               <ModalHeader title="Confirmar factura" subtitle="Revisá los datos antes de emitir" onClose={reset} />
               <div style={{ padding: '20px 24px' }}>
                 <div style={{ background: DS.colors.bg, borderRadius: 10, padding: '16px 18px', marginBottom: 16, border: `1px solid ${DS.colors.border}` }}>
-                  {[['Tipo', `Factura ${form.tipo}`], ['Receptor', form.razon || 'Consumidor Final'], ['CUIT', form.cuit || '—'], ['Concepto', form.concepto], ['Condición IVA', form.condicion]].map(([k, v]) => (
+                  {[['Comprobante', `FC ${form.tipo} ${nextNumFormatted}`], ['Tipo', `Factura ${form.tipo}`], ['Receptor', form.razon || 'Consumidor Final'], ['CUIT', form.cuit || '—'], ['Concepto', form.concepto], ['Condición IVA', form.condicion]].map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${DS.colors.border}` }}>
                       <span style={{ fontSize: 13, color: DS.colors.textMuted }}>{k}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.text }}>{v}</span>
@@ -252,30 +362,37 @@ function WebFactura({ navigate }) {
                 </div>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <Btn variant="secondary" style={{ flex: 1 }} onClick={() => setStep(1)}>Volver</Btn>
-                  <Btn variant="primary" style={{ flex: 1.4 }} onClick={() => setStep(3)}>Confirmar y emitir</Btn>
+                  <Btn variant="primary" style={{ flex: 1.4 }} onClick={confirm}>Confirmar y emitir</Btn>
                 </div>
               </div>
             </>
           )}
-          {step === 3 && (
-            <div style={{ padding: '38px 30px', textAlign: 'center' }}>
-              <div style={{ width: 60, height: 60, borderRadius: 99, background: DS.colors.successLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
-                <Icon name="check" size={30} color={DS.colors.success} strokeWidth={2.2} />
+          {step === 3 && (() => {
+            const emitida = invoices[0];
+            return (
+              <div style={{ padding: '38px 30px', textAlign: 'center' }}>
+                <div style={{ width: 60, height: 60, borderRadius: 99, background: DS.colors.successLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
+                  <Icon name="check" size={30} color={DS.colors.success} strokeWidth={2.2} />
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: DS.colors.text, marginBottom: 6 }}>Factura emitida</div>
+                <div style={{ fontSize: 13.5, color: DS.colors.textMuted }}>Factura {form.tipo} Nº {nextNumFormatted}</div>
+                <div style={{ fontSize: 25, fontWeight: 700, color: DS.colors.text, margin: '12px 0 20px' }}>${Number(form.monto || 0).toLocaleString('es-AR')}</div>
+                <div style={{ background: DS.colors.bg, borderRadius: 10, padding: '14px 20px', marginBottom: 22, border: `1px solid ${DS.colors.border}` }}>
+                  <div style={{ fontSize: 11, color: DS.colors.textMuted, letterSpacing: 0.4, fontWeight: 600 }}>CAE EMITIDO</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: DS.colors.text, marginTop: 4, letterSpacing: 1 }}>74392847163529</div>
+                  <div style={{ fontSize: 11, color: DS.colors.textMuted, marginTop: 2 }}>
+                    Vence: {(() => { const d = new Date(); d.setDate(d.getDate() + 10); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })()}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <Btn variant="secondary" style={{ flex: 1 }} onClick={() => downloadFactura({ num: nextNumFormatted, tipo: form.tipo, cliente: form.razon || 'Consumidor Final', cuit: form.cuit || '—', concepto: form.concepto, monto: form.monto, fecha: (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })() })}>
+                    <Icon name="download" size={15} color={DS.colors.primary} /> Descargar
+                  </Btn>
+                  <Btn variant="primary" style={{ flex: 1 }} onClick={reset}>Listo</Btn>
+                </div>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: DS.colors.text, marginBottom: 6 }}>Factura emitida</div>
-              <div style={{ fontSize: 13.5, color: DS.colors.textMuted }}>Factura {form.tipo} Nº 0001-00000125</div>
-              <div style={{ fontSize: 25, fontWeight: 700, color: DS.colors.text, margin: '12px 0 20px' }}>${Number(form.monto || 0).toLocaleString('es-AR')}</div>
-              <div style={{ background: DS.colors.bg, borderRadius: 10, padding: '14px 20px', marginBottom: 22, border: `1px solid ${DS.colors.border}` }}>
-                <div style={{ fontSize: 11, color: DS.colors.textMuted, letterSpacing: 0.4, fontWeight: 600 }}>CAE EMITIDO</div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: DS.colors.text, marginTop: 4, letterSpacing: 1 }}>74392847163529</div>
-                <div style={{ fontSize: 11, color: DS.colors.textMuted, marginTop: 2 }}>Vence: 07/05/2026</div>
-              </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <Btn variant="secondary" style={{ flex: 1 }} onClick={() => {}}><Icon name="download" size={15} color={DS.colors.primary} /> PDF</Btn>
-                <Btn variant="primary" style={{ flex: 1 }} onClick={reset}>Listo</Btn>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </Modal>
       )}
     </WebContent>
@@ -289,6 +406,47 @@ function WebVep({ navigate }) {
   const [periodo, setPeriodo] = React.useState('05/2026');
   const [copied, setCopied] = React.useState(false);
   const vepCode = '0110250427000000000012893745000000004283000';
+  const vepNum = '72.845.293';
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(vepCode).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = vepCode;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadVep = () => {
+    const content = [
+      `VEP Nº ${vepNum}`,
+      '='.repeat(50),
+      `Período: ${periodo}`,
+      `Impuesto integrado: $18.430`,
+      `Obra social: $15.800`,
+      `Aporte jubilatorio: $8.600`,
+      '='.repeat(50),
+      `TOTAL: $42.830`,
+      '',
+      `Código de pago electrónico:`,
+      vepCode,
+      '',
+      `Válido hasta: 20/05/2026 23:59 hs`,
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vep-${periodo.replace('/', '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <WebContent maxWidth={880}>
@@ -297,7 +455,7 @@ function WebVep({ navigate }) {
           <WebSection>Período a pagar</WebSection>
           <Card style={{ marginBottom: 20, padding: '10px 16px' }}>
             {[['04/2026', 'Pagado', 'pagado'], ['05/2026', 'Pendiente', 'pendiente'], ['06/2026', 'No vencido', 'futuro']].map(([p, label, est], i, arr) => (
-              <div key={p} onClick={() => est !== 'pagado' && setPeriodo(p)} style={{
+              <div key={p} onClick={() => { if (est !== 'pagado') { setPeriodo(p); setGenerated(false); } }} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '13px 6px', cursor: est === 'pagado' ? 'default' : 'pointer',
                 borderBottom: i < arr.length - 1 ? `1px solid ${DS.colors.border}` : 'none',
@@ -358,17 +516,17 @@ function WebVep({ navigate }) {
                     <Icon name="check" size={24} color={DS.colors.success} strokeWidth={2.2} />
                   </div>
                   <div style={{ fontSize: 11.5, fontWeight: 600, color: DS.colors.textMuted, letterSpacing: 0.4 }}>NÚMERO DE VEP</div>
-                  <div style={{ fontSize: 23, fontWeight: 700, color: DS.colors.text, letterSpacing: 1 }}>72.845.293</div>
+                  <div style={{ fontSize: 23, fontWeight: 700, color: DS.colors.text, letterSpacing: 1 }}>{vepNum}</div>
                   <div style={{ fontSize: 12, color: DS.colors.textMuted, marginTop: 2 }}>Válido hasta 20/05/2026 23:59 hs</div>
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: DS.colors.textMuted, letterSpacing: 0.4, marginBottom: 6 }}>CÓDIGO DE PAGO ELECTRÓNICO</div>
                 <div style={{ background: DS.colors.bg, borderRadius: 7, padding: '10px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: DS.colors.text, wordBreak: 'break-all', lineHeight: 1.6, marginBottom: 12, border: `1px solid ${DS.colors.border}` }}>{vepCode}</div>
-                <Btn variant="secondary" style={{ width: '100%' }} onClick={() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
-                  {copied ? <><Icon name="check" size={15} color={DS.colors.primary} /> Copiado</> : <><Icon name="copy" size={15} color={DS.colors.primary} /> Copiar código</>}
+                <Btn variant="secondary" style={{ width: '100%' }} onClick={copyCode}>
+                  {copied ? <><Icon name="check" size={15} color={DS.colors.success} /> Copiado</> : <><Icon name="copy" size={15} color={DS.colors.primary} /> Copiar código</>}
                 </Btn>
               </Card>
               <div style={{ display: 'flex', gap: 12 }}>
-                <Btn variant="outline" style={{ flex: 1 }} onClick={() => {}}><Icon name="download" size={15} color={DS.colors.primary} /> Descargar</Btn>
+                <Btn variant="outline" style={{ flex: 1 }} onClick={downloadVep}><Icon name="download" size={15} color={DS.colors.primary} /> Descargar</Btn>
                 <Btn variant="primary" style={{ flex: 1 }} onClick={() => setGenerated(false)}>Nuevo VEP</Btn>
               </div>
             </>
