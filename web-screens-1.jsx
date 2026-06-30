@@ -2,11 +2,33 @@
 // MonoClaro Web — Screens part 1: Dashboard, Facturación, VEP
 // ===================================================================
 
+// Constantes compartidas entre Dashboard, VEP y Vencimientos
+const CUOTAS_CAT = { A: 28420, B: 31580, C: 42830, D: 52340, E: 63150, F: 78600, G: 94350 };
+const TOPES_CAT  = { A: 2109906, B: 3150950, C: 4201265, D: 5251580, E: 6302896, F: 7878620, G: 9454344 };
+
+// Vencimientos mensuales 2026 (dia ajustado por fin de semana — no incluye feriados)
+const VCTOS_2026 = {
+   1: '20/01/2026',  2: '20/02/2026',  3: '20/03/2026',
+   4: '20/04/2026',  5: '20/05/2026',  6: '22/06/2026', // Sáb → Lun
+   7: '20/07/2026',  8: '20/08/2026',  9: '21/09/2026', // Dom → Lun
+  10: '20/10/2026', 11: '20/11/2026', 12: '21/12/2026', // Dom → Lun
+};
+
+function proximoVcto() {
+  const hoy = new Date();
+  for (let mes = 1; mes <= 12; mes++) {
+    const [d, m, y] = VCTOS_2026[mes].split('/');
+    const fecha = new Date(+y, +m - 1, +d);
+    if (fecha >= hoy) return { fecha, label: VCTOS_2026[mes], diasRestantes: Math.ceil((fecha - hoy) / 86400000) };
+  }
+  return null;
+}
+
 // ── DASHBOARD ───────────────────────────────────────────
 function WebDashboard({ navigate, userName, categoria, invoices }) {
   const bp = useBreakpoint();
-  const TOPES_CAT = { A: 2109906, B: 3150950, C: 4201265, D: 5251580, E: 6302896, F: 7878620, G: 9454344 };
-  const tope = TOPES_CAT[categoria] || 5251580;
+  const tope = TOPES_CAT[categoria] || TOPES_CAT.C;
+  const cuota = CUOTAS_CAT[categoria] || CUOTAS_CAT.C;
   const facturado = invoices.reduce((sum, f) => sum + f.monto, 0);
   const pct = Math.min(100, Math.round((facturado / tope) * 100));
 
@@ -16,6 +38,12 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
     return parseInt(m) === now.getMonth() + 1 && parseInt(y) === now.getFullYear();
   });
   const totalMes = facturasMes.reduce((s, f) => s + f.monto, 0);
+
+  const vcto = proximoVcto();
+  const mesesNombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const vctoMesLabel = vcto ? mesesNombres[vcto.fecha.getMonth()] : '';
+  const vctoLabel = vcto ? `${vcto.fecha.getDate()} ${vctoMesLabel.slice(0,3)}` : '—';
+  const vctoAlerta = vcto && vcto.diasRestantes <= 7;
 
   const fmt = (n) => n >= 1000000 ? `$${(n / 1000000).toFixed(2)}M` : `$${(n / 1000).toFixed(0)}K`;
 
@@ -34,27 +62,31 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
   return (
     <WebContent>
       {/* Alert banner */}
-      <div style={{
-        background: DS.colors.card, borderRadius: DS.radius.lg,
-        padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 13,
-        marginBottom: 22, border: `1px solid ${DS.colors.border}`,
-        borderLeft: `3px solid ${DS.colors.warning}`,
-        flexWrap: 'wrap',
-      }}>
-        <Icon name="alert" size={19} color={DS.colors.warning} />
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: DS.colors.text }}>Vencimiento próximo · </span>
-          <span style={{ fontSize: 13.5, color: DS.colors.textMid }}>Pago del monotributo de Mayo 2026 ($42.830) vence en 5 días</span>
+      {vcto && vcto.diasRestantes <= 10 && (
+        <div style={{
+          background: DS.colors.card, borderRadius: DS.radius.lg,
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 13,
+          marginBottom: 22, border: `1px solid ${DS.colors.border}`,
+          borderLeft: `3px solid ${vctoAlerta ? DS.colors.danger : DS.colors.warning}`,
+          flexWrap: 'wrap',
+        }}>
+          <Icon name="alert" size={19} color={vctoAlerta ? DS.colors.danger : DS.colors.warning} />
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: DS.colors.text }}>Vencimiento próximo · </span>
+            <span style={{ fontSize: 13.5, color: DS.colors.textMid }}>
+              Pago del monotributo de {vctoMesLabel} ${cuota.toLocaleString('es-AR')} vence en {vcto.diasRestantes} día{vcto.diasRestantes !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <Btn variant="primary" style={{ padding: '8px 15px', fontSize: 13 }} onClick={() => navigate('vep')}>Generar VEP</Btn>
         </div>
-        <Btn variant="primary" style={{ padding: '8px 15px', fontSize: 13 }} onClick={() => navigate('vep')}>Generar VEP</Btn>
-      </div>
+      )}
 
       {/* Stat tiles */}
       <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? 'repeat(2, 1fr)' : bp === 'md' ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 14, marginBottom: 26 }}>
-        <StatTile label="FACTURADO 2026" value={fmt(facturado)} sub={`${pct}% del tope anual`} icon="dollar" accent={DS.colors.primary} trend={{ up: true, value: '12%' }} />
-        <StatTile label="CATEGORÍA ACTUAL" value={`Cat. ${categoria}`} sub="Cuota $42.830 / mes" icon="fileText" accent={DS.colors.accent} />
+        <StatTile label={`FACTURADO ${now.getFullYear()}`} value={fmt(facturado)} sub={`${pct}% del tope anual`} icon="dollar" accent={DS.colors.primary} />
+        <StatTile label="CATEGORÍA ACTUAL" value={`Cat. ${categoria}`} sub={`Cuota $${cuota.toLocaleString('es-AR')} / mes`} icon="fileText" accent={DS.colors.accent} />
         <StatTile label="FACTURAS DEL MES" value={facturasMes.length} sub={`${fmt(totalMes)} emitido`} icon="invoice" accent={DS.colors.success} />
-        <StatTile label="PRÓXIMO PAGO" value="20 May" sub="Quedan 5 días" icon="clock" accent={DS.colors.warning} />
+        <StatTile label="PRÓXIMO PAGO" value={vctoLabel} sub={vcto ? `Quedan ${vcto.diasRestantes} día${vcto.diasRestantes !== 1 ? 's' : ''}` : '—'} icon="clock" accent={DS.colors.warning} />
       </div>
 
       {/* Two columns */}
@@ -137,11 +169,22 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
 
           <WebSection action="Ver todos" onAction={() => navigate('vencimientos')}>Próximos vencimientos</WebSection>
           <Card style={{ padding: '2px 18px' }}>
-            {[
-              { dia: '20', mes: 'MAY', tipo: 'Monotributo', desc: 'Pago mensual', proximo: true },
-              { dia: '30', mes: 'JUN', tipo: 'Recategorización', desc: 'Semestral obligatoria', proximo: false },
-              { dia: '20', mes: 'JUL', tipo: 'Monotributo', desc: 'Pago mensual', proximo: false },
-            ].map((v, i, arr) => (
+            {(() => {
+              const hoy = new Date();
+              const proximos = [];
+              for (let mes = 1; mes <= 12 && proximos.length < 3; mes++) {
+                const [d, m, y] = VCTOS_2026[mes].split('/');
+                const fecha = new Date(+y, +m - 1, +d);
+                if (fecha >= hoy) {
+                  const mLabel = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'][mes-1];
+                  const dias = Math.ceil((fecha - hoy) / 86400000);
+                  proximos.push({ dia: d, mes: mLabel, tipo: 'Monotributo', desc: `Pago mensual — ${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mes-1]} ${y}`, proximo: dias <= 7 });
+                }
+              }
+              // Agregar recategorización semestral
+              if (hoy < new Date(2026, 6, 20)) proximos.splice(1, 0, { dia: '20', mes: 'JUL', tipo: 'Recategorización', desc: 'Semestral obligatoria — 1er semestre', proximo: false });
+              return proximos.slice(0, 3);
+            })().map((v, i, arr) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 13, padding: '13px 0',
                 borderBottom: i < arr.length - 1 ? `1px solid ${DS.colors.border}` : 'none',
@@ -174,7 +217,8 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
   const [showModal, setShowModal] = React.useState(false);
   const [step, setStep] = React.useState(1);
   const [search, setSearch] = React.useState('');
-  const [form, setForm] = React.useState({ tipo: 'C', cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' });
+  const [form, setForm] = React.useState({ tipo: 'C', conceptoTipo: 2, cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' });
+  const [pdfFile, setPdfFile] = React.useState(null);
   const [caeResult, setCaeResult] = React.useState(null); // { numero, cae, vencimientoCAE }
   const [confirming, setConfirming] = React.useState(false);
   const [confirmError, setConfirmError] = React.useState(null);
@@ -188,8 +232,8 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
   }, [invoices]);
 
   const reset = () => {
-    setShowModal(false); setStep(1); setConfirmError(null); setCaeResult(null);
-    setForm({ tipo: 'C', cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' });
+    setShowModal(false); setStep(1); setConfirmError(null); setCaeResult(null); setPdfFile(null);
+    setForm({ tipo: 'C', conceptoTipo: 2, cuit: '', razon: '', concepto: '', monto: '', condicion: 'Consumidor Final' });
   };
 
   // Lookup de CUIT en el padrón ARCA
@@ -229,7 +273,7 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
             cuit: emisorCuit,
             ptoVta: 1,
             tipo: form.tipo,
-            concepto: 2,
+            concepto: form.conceptoTipo,
             docTipo,
             docNro,
             importeTotal: Number(form.monto),
@@ -394,8 +438,8 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
               <ModalHeader title="Nueva factura" subtitle="Completá los datos del comprobante" onClose={reset} />
               <div style={{ padding: '20px 24px' }}>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: DS.colors.textMid, marginBottom: 8, letterSpacing: 0.3 }}>TIPO DE COMPROBANTE</div>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-                  {[['C', 'Consumidor Final'], ['E', 'Exportación']].map(([t, d]) => (
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                  {[['C', 'Mercado interno'], ['E', 'Exportación']].map(([t, d]) => (
                     <div key={t} onClick={() => set('tipo', t)} style={{
                       flex: 1, padding: '12px', borderRadius: 9, textAlign: 'center', cursor: 'pointer',
                       border: `1.5px solid ${form.tipo === t ? DS.colors.primary : DS.colors.border}`,
@@ -406,6 +450,19 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
                     </div>
                   ))}
                 </div>
+
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: DS.colors.textMid, marginBottom: 8, letterSpacing: 0.3 }}>TIPO DE OPERACIÓN</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+                  {[[1,'Productos'],[2,'Servicios'],[3,'Prod. + Serv.']].map(([v, l]) => (
+                    <div key={v} onClick={() => set('conceptoTipo', v)} style={{
+                      flex: 1, padding: '8px 6px', borderRadius: 8, textAlign: 'center', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                      border: `1.5px solid ${form.conceptoTipo === v ? DS.colors.accent : DS.colors.border}`,
+                      background: form.conceptoTipo === v ? '#F0FDF4' : '#fff',
+                      color: form.conceptoTipo === v ? DS.colors.accent : DS.colors.textMuted,
+                    }}>{l}</div>
+                  ))}
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? '1fr' : '1fr 1fr', gap: 14 }}>
                   <div>
                     <Field label="CUIT / DNI (opcional)" value={form.cuit} onChange={v => set('cuit', v)} placeholder="20-12345678-3" />
@@ -420,9 +477,26 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
                   </div>
                   <Field label="Razón Social / Nombre" value={form.razon} onChange={v => set('razon', v)} placeholder="Consumidor Final" />
                 </div>
-                <Field label="Concepto" value={form.concepto} onChange={v => set('concepto', v)} placeholder="Servicios profesionales — Abril 2026" />
+                <Field label="Descripción / Concepto" value={form.concepto} onChange={v => set('concepto', v)} placeholder="Servicios profesionales — Junio 2026" />
                 <Field label="Monto total" value={form.monto} onChange={v => set('monto', v.replace(/\D/g, ''))} placeholder="0" prefix="$" type="tel" />
-                <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: DS.colors.textMid, marginBottom: 6, letterSpacing: 0.3 }}>ADJUNTAR PDF (OPCIONAL)</div>
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 9,
+                    border: `1.5px dashed ${pdfFile ? DS.colors.accent : DS.colors.border}`,
+                    background: pdfFile ? '#F0FDF4' : DS.colors.bg, cursor: 'pointer',
+                  }}>
+                    <Icon name="download" size={16} color={pdfFile ? DS.colors.accent : DS.colors.textMuted} />
+                    <span style={{ fontSize: 13, color: pdfFile ? DS.colors.accent : DS.colors.textMuted, flex: 1 }}>
+                      {pdfFile ? pdfFile.name : 'Seleccionar archivo PDF…'}
+                    </span>
+                    {pdfFile && <span onClick={e => { e.preventDefault(); setPdfFile(null); }} style={{ fontSize: 11, color: DS.colors.danger, cursor: 'pointer' }}>✕</span>}
+                    <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => setPdfFile(e.target.files[0] || null)} />
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                   <Btn variant="secondary" style={{ flex: 1 }} onClick={reset}>Cancelar</Btn>
                   <Btn variant="primary" style={{ flex: 1 }} disabled={!form.concepto || !form.monto} onClick={() => setStep(2)}>Continuar</Btn>
                 </div>
@@ -434,7 +508,7 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
               <ModalHeader title="Confirmar factura" subtitle="Revisá los datos antes de emitir" onClose={reset} />
               <div style={{ padding: '20px 24px' }}>
                 <div style={{ background: DS.colors.bg, borderRadius: 10, padding: '16px 18px', marginBottom: 16, border: `1px solid ${DS.colors.border}` }}>
-                  {[['Comprobante', `FC ${form.tipo} ${nextNumFormatted}`], ['Tipo', `Factura ${form.tipo}`], ['Receptor', form.razon || 'Consumidor Final'], ['CUIT', form.cuit || '—'], ['Concepto', form.concepto], ['Condición IVA', form.condicion]].map(([k, v]) => (
+                  {[['Comprobante', `FC ${form.tipo} ${nextNumFormatted}`], ['Tipo', `Factura ${form.tipo}`], ['Operación', ['','Productos','Servicios','Prod. + Servicios'][form.conceptoTipo] || 'Servicios'], ['Receptor', form.razon || 'Consumidor Final'], ['CUIT', form.cuit || '—'], ['Concepto', form.concepto], ['Condición IVA', form.condicion]].map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${DS.colors.border}` }}>
                       <span style={{ fontSize: 13, color: DS.colors.textMuted }}>{k}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.text }}>{v}</span>
@@ -493,34 +567,51 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
 }
 window.WebFactura = WebFactura;
 
+// Códigos de pago homebanking para monotributo (formulario ARCA 1002)
+const CODIGOS_PAGO = {
+  impuesto: '217',
+  formulario: '1002',
+  subconceptos: { integrado: '019', obraSocial: '021', jubilatorio: '020' },
+};
+
+const DETALLE_CAT = {
+  A: { integrado: 12020, obraSocial: 11800, jubilatorio: 4600 },
+  B: { integrado: 14880, obraSocial: 11800, jubilatorio: 4900 },
+  C: { integrado: 18430, obraSocial: 15800, jubilatorio: 8600 },
+  D: { integrado: 24740, obraSocial: 18800, jubilatorio: 8800 },
+  E: { integrado: 33550, obraSocial: 20800, jubilatorio: 8800 },
+  F: { integrado: 48200, obraSocial: 21600, jubilatorio: 8800 },
+  G: { integrado: 62950, obraSocial: 22600, jubilatorio: 8800 },
+};
+
 // ── GENERAR VEP ─────────────────────────────────────────
 function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep, token }) {
   const bp = useBreakpoint();
-  const [currentVep, setCurrentVep] = React.useState(null); // VEP generado en esta sesión
-  const [periodo, setPeriodo] = React.useState('05/2026');
-  const [copied, setCopied] = React.useState(false);
+  const [currentVep, setCurrentVep] = React.useState(null);
   const [generating, setGenerating] = React.useState(false);
+  const [copied, setCopied] = React.useState('');
 
-  const CUOTAS = { A: 28420, B: 31580, C: 42830, D: 52340, E: 63150, F: 78600, G: 94350 };
-  const DETALLE_CAT = {
-    A: { integrado: 12020, obraSocial: 11800, jubilatorio: 4600 },
-    B: { integrado: 14880, obraSocial: 11800, jubilatorio: 4900 },
-    C: { integrado: 18430, obraSocial: 15800, jubilatorio: 8600 },
-    D: { integrado: 24740, obraSocial: 18800, jubilatorio: 8800 },
-    E: { integrado: 33550, obraSocial: 20800, jubilatorio: 8800 },
-    F: { integrado: 48200, obraSocial: 21600, jubilatorio: 8800 },
-    G: { integrado: 62950, obraSocial: 22600, jubilatorio: 8800 },
-  };
-  const monto = CUOTAS[categoria] || CUOTAS.C;
+  // Período actual: mes en curso
+  const hoy = new Date();
+  const mesActual = `${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+  const [periodo, setPeriodo] = React.useState(mesActual);
+
+  const monto = CUOTAS_CAT[categoria] || CUOTAS_CAT.C;
   const detalle = DETALLE_CAT[categoria] || DETALLE_CAT.C;
 
-  // Períodos: los 2 anteriores como pagados (o los que hay en veps), el actual y el próximo
-  const periodosPagados = new Set((veps || []).filter(v => v.estado === 'pagado').map(v => v.periodo));
+  // Períodos: 3 meses anteriores + actual + próximo
+  const periodosPagados   = new Set((veps || []).filter(v => v.estado === 'pagado').map(v => v.periodo));
   const periodosGenerados = new Set((veps || []).map(v => v.periodo));
-  const periodos = ['03/2026', '04/2026', '05/2026', '06/2026'].map(p => ({
-    p,
-    estado: periodosPagados.has(p) ? 'pagado' : periodosGenerados.has(p) ? 'pendiente' : 'futuro',
-  }));
+  const periodos = (() => {
+    const list = [];
+    const base = new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1);
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      const p = `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      list.push({ p, estado: periodosPagados.has(p) ? 'pagado' : periodosGenerados.has(p) ? 'pendiente' : 'futuro' });
+    }
+    return list;
+  })();
 
   const generarVep = async () => {
     setGenerating(true);
@@ -544,43 +635,23 @@ function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep, token }) 
     setGenerating(false);
   };
 
-  const copyCode = (code) => {
-    navigator.clipboard.writeText(code).catch(() => {
+  const copyCode = (val, key) => {
+    navigator.clipboard.writeText(val).catch(() => {
       const ta = document.createElement('textarea');
-      ta.value = code; document.body.appendChild(ta); ta.select();
+      ta.value = val; document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
     });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(key);
+    setTimeout(() => setCopied(''), 2000);
   };
 
-  const downloadVep = (vep) => {
-    const content = [
-      `VEP Nº ${vep.numero}`,
-      '='.repeat(50),
-      `Período: ${periodo}`,
-      `Impuesto integrado: $${detalle.integrado.toLocaleString('es-AR')}`,
-      `Obra social: $${detalle.obraSocial.toLocaleString('es-AR')}`,
-      `Aporte jubilatorio: $${detalle.jubilatorio.toLocaleString('es-AR')}`,
-      '='.repeat(50),
-      `TOTAL: $${monto.toLocaleString('es-AR')}`,
-      '',
-      'Código de pago electrónico:',
-      vep.codigo,
-      '',
-      `Válido hasta: ${vep.vencimiento} 23:59 hs`,
-    ].join('\n');
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `vep-${periodo.replace('/', '-')}.txt`;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
-  };
+  const vctoMes = VCTOS_2026[parseInt(periodo.split('/')[0])];
+  const vctoLabel = vctoMes || `20/${periodo}`;
 
   return (
-    <WebContent maxWidth={880}>
-      <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? '1fr' : '1fr 1fr', gap: 24, alignItems: 'start' }}>
+    <WebContent maxWidth={920}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'lg' ? '1fr 1.4fr' : '1fr', gap: 24, alignItems: 'start' }}>
+        {/* Columna izquierda: período + detalle */}
         <div>
           <WebSection>Período a pagar</WebSection>
           <Card style={{ marginBottom: 20, padding: '10px 16px' }}>
@@ -607,11 +678,18 @@ function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep, token }) 
             ))}
           </Card>
 
-          <WebSection>Detalle de la cuota · Cat. {categoria}</WebSection>
+          <WebSection>Detalle · Categoría {categoria}</WebSection>
           <Card>
-            {[['Impuesto integrado', detalle.integrado], ['Obra social', detalle.obraSocial], ['Aporte jubilatorio', detalle.jubilatorio]].map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${DS.colors.border}` }}>
-                <span style={{ fontSize: 13, color: DS.colors.textMuted }}>{k}</span>
+            {[
+              ['Impuesto integrado', detalle.integrado, CODIGOS_PAGO.subconceptos.integrado],
+              ['Obra social', detalle.obraSocial, CODIGOS_PAGO.subconceptos.obraSocial],
+              ['Aporte jubilatorio', detalle.jubilatorio, CODIGOS_PAGO.subconceptos.jubilatorio],
+            ].map(([k, v, cod]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${DS.colors.border}`, alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 13, color: DS.colors.textMid }}>{k}</div>
+                  <div style={{ fontSize: 10.5, color: DS.colors.textMuted, marginTop: 1 }}>Subconcepto {cod}</div>
+                </div>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>${v.toLocaleString('es-AR')}</span>
               </div>
             ))}
@@ -622,23 +700,53 @@ function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep, token }) 
           </Card>
         </div>
 
+        {/* Columna derecha: VEP + códigos de pago */}
         <div>
           {!currentVep ? (
             <>
-              <WebSection>Generar volante</WebSection>
-              <Card style={{ textAlign: 'center', padding: '30px 24px' }}>
-                <div style={{ width: 56, height: 56, borderRadius: 12, background: DS.colors.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <WebSection>Generar volante de pago</WebSection>
+              <Card style={{ textAlign: 'center', padding: '28px 24px', marginBottom: 16 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 12, background: DS.colors.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
                   <Icon name="card" size={26} color={DS.colors.primary} />
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: DS.colors.text }}>VEP para período {periodo}</div>
-                <div style={{ fontSize: 12.5, color: DS.colors.textMuted, margin: '5px 0' }}>Volante Electrónico de Pago</div>
-                <div style={{ fontSize: 27, fontWeight: 700, color: DS.colors.text, margin: '10px 0 16px' }}>${monto.toLocaleString('es-AR')}</div>
-                <div style={{ background: DS.colors.bg, borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 12, color: DS.colors.textMid, border: `1px solid ${DS.colors.border}` }}>
-                  Vence el <strong>20/{periodo}</strong>
+                <div style={{ fontSize: 16, fontWeight: 700, color: DS.colors.text }}>Monotributo {periodo}</div>
+                <div style={{ fontSize: 27, fontWeight: 700, color: DS.colors.text, margin: '8px 0' }}>${monto.toLocaleString('es-AR')}</div>
+                <div style={{ fontSize: 12, color: DS.colors.textMuted, marginBottom: 18 }}>
+                  Vence el <strong>{vctoLabel}</strong>
                 </div>
-                <Btn variant="primary" style={{ width: '100%' }} disabled={generating} onClick={generarVep}>
+                <Btn variant="primary" style={{ width: '100%', marginBottom: 12 }} disabled={generating} onClick={generarVep}>
                   {generating ? 'Generando…' : 'Generar VEP'}
                 </Btn>
+                <a href="https://servicios1.afip.gob.ar/vep/" target="_blank" rel="noopener" style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  fontSize: 12.5, color: DS.colors.primary, textDecoration: 'none', fontWeight: 600,
+                }}>
+                  También podés generarlo en el portal ARCA →
+                </a>
+              </Card>
+
+              {/* Códigos para homebanking */}
+              <Card>
+                <div style={{ fontSize: 12, fontWeight: 700, color: DS.colors.textMid, letterSpacing: 0.4, marginBottom: 12 }}>CÓDIGOS PARA PAGO POR HOMEBANKING</div>
+                {[
+                  ['Impuesto', CODIGOS_PAGO.impuesto],
+                  ['Formulario', CODIGOS_PAGO.formulario],
+                  ['Período', `${periodo.slice(3)}-${periodo.slice(0,2)}`],
+                  ['CUIT', (cuitEmisor || '').replace(/\D/g, '')],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${DS.colors.border}` }}>
+                    <span style={{ fontSize: 12.5, color: DS.colors.textMuted }}>{k}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: DS.colors.text }}>{v}</span>
+                      <span onClick={() => copyCode(v, k)} style={{ cursor: 'pointer', fontSize: 11, color: copied === k ? DS.colors.success : DS.colors.primary, fontWeight: 600 }}>
+                        {copied === k ? '✓' : 'Copiar'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: DS.colors.textMuted, marginTop: 10, lineHeight: 1.5 }}>
+                  Usá estos datos en tu banco para pagar sin generar VEP. El importe se ingresa manualmente.
+                </div>
               </Card>
             </>
           ) : (
@@ -649,19 +757,30 @@ function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep, token }) 
                   <div style={{ width: 48, height: 48, borderRadius: 99, background: DS.colors.successLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
                     <Icon name="check" size={24} color={DS.colors.success} strokeWidth={2.2} />
                   </div>
-                  <div style={{ fontSize: 11.5, fontWeight: 600, color: DS.colors.textMuted, letterSpacing: 0.4 }}>NÚMERO DE VEP</div>
-                  <div style={{ fontSize: 23, fontWeight: 700, color: DS.colors.text, letterSpacing: 1 }}>{currentVep.numero}</div>
-                  <div style={{ fontSize: 12, color: DS.colors.textMuted, marginTop: 2 }}>Válido hasta {currentVep.vencimiento} 23:59 hs</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: DS.colors.textMuted, letterSpacing: 0.4 }}>VEP GENERADO — PERÍODO {periodo}</div>
+                  <div style={{ fontSize: 27, fontWeight: 700, color: DS.colors.text, margin: '6px 0 2px' }}>${monto.toLocaleString('es-AR')}</div>
+                  <div style={{ fontSize: 12, color: DS.colors.textMuted }}>Válido hasta {vctoLabel} 23:59 hs</div>
                 </div>
+
                 <div style={{ fontSize: 11, fontWeight: 600, color: DS.colors.textMuted, letterSpacing: 0.4, marginBottom: 6 }}>CÓDIGO DE PAGO ELECTRÓNICO</div>
-                <div style={{ background: DS.colors.bg, borderRadius: 7, padding: '10px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: DS.colors.text, wordBreak: 'break-all', lineHeight: 1.6, marginBottom: 12, border: `1px solid ${DS.colors.border}` }}>{currentVep.codigo}</div>
-                <Btn variant="secondary" style={{ width: '100%' }} onClick={() => copyCode(currentVep.codigo)}>
-                  {copied ? <><Icon name="check" size={15} color={DS.colors.success} /> Copiado</> : <><Icon name="copy" size={15} color={DS.colors.primary} /> Copiar código</>}
+                <div style={{ background: DS.colors.bg, borderRadius: 7, padding: '10px 12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: DS.colors.text, wordBreak: 'break-all', lineHeight: 1.6, marginBottom: 10, border: `1px solid ${DS.colors.border}` }}>{currentVep.codigo}</div>
+                <Btn variant="secondary" style={{ width: '100%', marginBottom: 12 }} onClick={() => copyCode(currentVep.codigo, 'vep')}>
+                  {copied === 'vep' ? <><Icon name="check" size={15} color={DS.colors.success} /> Copiado</> : <><Icon name="copy" size={15} color={DS.colors.primary} /> Copiar código</>}
                 </Btn>
+
+                <div style={{ fontSize: 12, fontWeight: 700, color: DS.colors.textMid, letterSpacing: 0.4, marginBottom: 10 }}>CÓDIGOS HOMEBANKING</div>
+                {[['Impuesto', CODIGOS_PAGO.impuesto], ['Formulario', CODIGOS_PAGO.formulario]].map(([k, v]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${DS.colors.border}` }}>
+                    <span style={{ fontSize: 12, color: DS.colors.textMuted }}>{k}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{v}</span>
+                  </div>
+                ))}
               </Card>
               <div style={{ display: 'flex', gap: 12 }}>
-                <Btn variant="outline" style={{ flex: 1 }} onClick={() => downloadVep(currentVep)}><Icon name="download" size={15} color={DS.colors.primary} /> Descargar</Btn>
-                <Btn variant="primary" style={{ flex: 1 }} onClick={() => setCurrentVep(null)}>Nuevo VEP</Btn>
+                <Btn variant="outline" style={{ flex: 1 }} onClick={() => setCurrentVep(null)}>Nuevo período</Btn>
+                <a href="https://servicios1.afip.gob.ar/vep/" target="_blank" rel="noopener" style={{ flex: 1, textDecoration: 'none' }}>
+                  <Btn variant="primary" style={{ width: '100%' }}>Pagar en ARCA →</Btn>
+                </a>
               </div>
             </>
           )}

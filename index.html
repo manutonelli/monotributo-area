@@ -118,7 +118,7 @@ function ClientApp({ session, onLogout }) {
       case 'dashboard':        return <WebDashboard {...p} />;
       case 'factura':          return <WebFactura {...p} />;
       case 'vep':              return <WebVep {...p} />;
-      case 'vencimientos':     return <WebVencimientos {...p} />;
+      case 'vencimientos':     return <WebVencimientos navigate={p.navigate} categoria={p.categoria} />;
       case 'topes':            return <WebTopes {...p} />;
       case 'recategorizacion': return <WebRecategorizacion {...p} />;
       case 'derivar':          return <WebDerivar {...p} />;

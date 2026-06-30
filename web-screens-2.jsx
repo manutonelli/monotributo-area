@@ -3,77 +3,116 @@
 // =======================================================================================
 
 // ── VENCIMIENTOS ────────────────────────────────────────
-function WebVencimientos({ navigate }) {
+function WebVencimientos({ navigate, categoria }) {
   const bp = useBreakpoint();
-  const [mes, setMes] = React.useState(4);
+  const hoy = new Date();
+  const mesActual = hoy.getMonth(); // 0-indexed
+
+  // Seleccionar mes actual por defecto
+  const [mes, setMes] = React.useState(mesActual);
   const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const data = {
-    3: [
-      { dia: 15, tipo: 'DDJJ Informativa', desc: 'Declaración de ingresos', monto: '—', estado: 'pagado' },
-      { dia: 20, tipo: 'Monotributo', desc: 'Pago mensual — Abril 2026', monto: '$42.830', estado: 'pagado' },
-    ],
-    4: [
-      { dia: 20, tipo: 'Monotributo', desc: 'Pago mensual — Mayo 2026', monto: '$42.830', estado: 'proximo' },
-      { dia: 31, tipo: 'Recategorización', desc: 'Período enero–junio (opcional)', monto: '—', estado: 'futuro' },
-    ],
-    5: [
-      { dia: 20, tipo: 'Monotributo', desc: 'Pago mensual — Junio 2026', monto: '$42.830', estado: 'futuro' },
-      { dia: 30, tipo: 'Recategorización', desc: 'Semestral obligatoria', monto: '—', estado: 'futuro' },
-    ],
+  const mesesFull = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const cuota = (typeof CUOTAS_CAT !== 'undefined' ? CUOTAS_CAT : { C: 42830 })[categoria] || 42830;
+  const cuotaFmt = `$${cuota.toLocaleString('es-AR')}`;
+
+  // Calendario completo 2026 — Fuente: ARCA/RG vigentes
+  // Monotributo: vence el 20 de cada mes (siguiente día hábil si cae sáb/dom)
+  // Recategorización semestral: 1er sem (ene-jun) → hasta 20/07, 2do sem (jul-dic) → hasta 20/01/2027
+  const CALENDARIO = {
+    0:  [{ dia: 20, fecha: '20/01/2026', tipo: 'Monotributo', desc: `Pago mensual enero 2026`, monto: cuotaFmt, esVep: true }],
+    1:  [{ dia: 20, fecha: '20/02/2026', tipo: 'Monotributo', desc: `Pago mensual febrero 2026`, monto: cuotaFmt, esVep: true }],
+    2:  [{ dia: 20, fecha: '20/03/2026', tipo: 'Monotributo', desc: `Pago mensual marzo 2026`, monto: cuotaFmt, esVep: true }],
+    3:  [{ dia: 20, fecha: '20/04/2026', tipo: 'Monotributo', desc: `Pago mensual abril 2026`, monto: cuotaFmt, esVep: true }],
+    4:  [{ dia: 20, fecha: '20/05/2026', tipo: 'Monotributo', desc: `Pago mensual mayo 2026`, monto: cuotaFmt, esVep: true }],
+    5:  [
+          { dia: 20, fecha: '22/06/2026', tipo: 'Monotributo', desc: `Pago mensual junio 2026 (sáb → lun 22)`, monto: cuotaFmt, esVep: true },
+        ],
+    6:  [
+          { dia: 20, fecha: '20/07/2026', tipo: 'Monotributo', desc: `Pago mensual julio 2026`, monto: cuotaFmt, esVep: true },
+          { dia: 20, fecha: '20/07/2026', tipo: 'Recategorización', desc: 'Semestral 1er semestre (ene–jun 2026)', monto: '—', esVep: false },
+        ],
+    7:  [{ dia: 20, fecha: '20/08/2026', tipo: 'Monotributo', desc: `Pago mensual agosto 2026`, monto: cuotaFmt, esVep: true }],
+    8:  [{ dia: 21, fecha: '21/09/2026', tipo: 'Monotributo', desc: `Pago mensual septiembre 2026 (dom → lun 21)`, monto: cuotaFmt, esVep: true }],
+    9:  [{ dia: 20, fecha: '20/10/2026', tipo: 'Monotributo', desc: `Pago mensual octubre 2026`, monto: cuotaFmt, esVep: true }],
+    10: [{ dia: 20, fecha: '20/11/2026', tipo: 'Monotributo', desc: `Pago mensual noviembre 2026`, monto: cuotaFmt, esVep: true }],
+    11: [{ dia: 21, fecha: '21/12/2026', tipo: 'Monotributo', desc: `Pago mensual diciembre 2026 (dom → lun 21)`, monto: cuotaFmt, esVep: true }],
   };
+
+  const calcEstado = (fecha) => {
+    const [d, m, y] = fecha.split('/');
+    const f = new Date(+y, +m - 1, +d);
+    const diff = Math.ceil((f - hoy) / 86400000);
+    if (diff < 0) return 'pagado';
+    if (diff <= 7) return 'proximo';
+    return 'futuro';
+  };
+
+  const items = (CALENDARIO[mes] || []).map(i => ({ ...i, estado: calcEstado(i.fecha) }));
+
   const estados = {
-    pagado:   { c: DS.colors.success, bg: DS.colors.successLight, label: 'Pagado' },
-    pendiente:{ c: DS.colors.warning, bg: DS.colors.warningLight, label: 'Pendiente' },
-    proximo:  { c: DS.colors.danger,  bg: DS.colors.dangerLight,  label: 'Vence pronto' },
-    futuro:   { c: DS.colors.textMuted, bg: DS.colors.bg,         label: 'Programado' },
+    pagado:  { c: DS.colors.success,   bg: DS.colors.successLight, label: 'Vencido / Pagar' },
+    proximo: { c: DS.colors.danger,    bg: DS.colors.dangerLight,  label: 'Vence pronto' },
+    futuro:  { c: DS.colors.textMuted, bg: DS.colors.bg,           label: 'Programado' },
   };
-  const items = data[mes] || [];
+
+  const totalAnio = Object.values(CALENDARIO).flat().length;
+  const pagados   = Object.values(CALENDARIO).flat().filter(i => calcEstado(i.fecha) === 'pagado').length;
+  const proximos  = Object.values(CALENDARIO).flat().filter(i => calcEstado(i.fecha) === 'proximo').length;
 
   return (
     <WebContent maxWidth={960}>
-      {/* Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? '1fr' : 'repeat(3, 1fr)', gap: 14, marginBottom: 22 }}>
-        <StatTile label="PAGADOS EN EL PERÍODO" value={items.filter(i => i.estado === 'pagado').length} sub="Al día con AFIP" icon="check" accent={DS.colors.success} />
-        <StatTile label="PENDIENTES" value={items.filter(i => ['pendiente','proximo'].includes(i.estado)).length} sub="Requieren acción" icon="clock" accent={DS.colors.warning} />
-        <StatTile label="PROGRAMADOS" value={items.filter(i => i.estado === 'futuro').length} sub="Próximos meses" icon="calendar" accent={DS.colors.primary} />
+        <StatTile label="VENCIDOS / PASADOS" value={pagados} sub="Verificar pago" icon="check" accent={DS.colors.success} />
+        <StatTile label="VENCEN PRONTO" value={proximos} sub="En los próximos 7 días" icon="clock" accent={DS.colors.danger} />
+        <StatTile label="TOTAL AÑO 2026" value={totalAnio} sub="Vencimientos del período" icon="calendar" accent={DS.colors.primary} />
       </div>
 
-      {/* Month selector */}
       <Card style={{ padding: '10px 12px', marginBottom: 20 }}>
         <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
-          {meses.map((m, i) => (
-            <div key={i} onClick={() => setMes(i)} style={{
-              padding: '7px 14px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
-              background: mes === i ? DS.colors.primary : 'transparent',
-              color: mes === i ? '#fff' : DS.colors.textMid,
-            }}>{m}</div>
-          ))}
+          {meses.map((m, i) => {
+            const tieneProximo = (CALENDARIO[i] || []).some(x => calcEstado(x.fecha) === 'proximo');
+            return (
+              <div key={i} onClick={() => setMes(i)} style={{
+                padding: '7px 14px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+                background: mes === i ? DS.colors.primary : 'transparent',
+                color: mes === i ? '#fff' : tieneProximo ? DS.colors.danger : DS.colors.textMid,
+                position: 'relative',
+              }}>
+                {m}
+                {tieneProximo && mes !== i && <span style={{ position: 'absolute', top: 4, right: 4, width: 6, height: 6, borderRadius: 99, background: DS.colors.danger }} />}
+              </div>
+            );
+          })}
         </div>
       </Card>
 
-      <WebSection>{meses[mes]} 2026</WebSection>
+      <WebSection>{mesesFull[mes]} 2026</WebSection>
+
       {items.length === 0 && (
-        <Card style={{ textAlign: 'center', padding: '34px', color: DS.colors.textMuted, fontSize: 13.5 }}>Sin vencimientos en este período</Card>
+        <Card style={{ textAlign: 'center', padding: '34px', color: DS.colors.textMuted, fontSize: 13.5 }}>Sin vencimientos registrados en este mes</Card>
       )}
       {items.map((item, i) => {
-        const s = estados[item.estado];
+        const s = estados[item.estado] || estados.futuro;
         return (
           <Card key={i} style={{ marginBottom: 10, padding: '15px 18px' }}>
-            <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 15, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 9, background: DS.colors.bg, border: `1px solid ${DS.colors.border}`,
+                width: 48, height: 48, borderRadius: 9,
+                background: item.estado === 'proximo' ? DS.colors.dangerLight : DS.colors.bg,
+                border: `1px solid ${item.estado === 'proximo' ? DS.colors.danger + '40' : DS.colors.border}`,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>
-                <div style={{ fontSize: 17, fontWeight: 700, color: DS.colors.text, lineHeight: 1 }}>{item.dia}</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: item.estado === 'proximo' ? DS.colors.danger : DS.colors.text, lineHeight: 1 }}>{item.dia}</div>
                 <div style={{ fontSize: 9, color: DS.colors.textMuted, fontWeight: 600, marginTop: 2 }}>{meses[mes].toUpperCase()}</div>
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 140 }}>
                 <div style={{ fontSize: 14.5, fontWeight: 600, color: DS.colors.text }}>{item.tipo}</div>
                 <div style={{ fontSize: 12.5, color: DS.colors.textMuted, marginTop: 2 }}>{item.desc}</div>
               </div>
               {item.monto !== '—' && <div style={{ fontSize: 15, fontWeight: 700, color: DS.colors.text }}>{item.monto}</div>}
-              <Badge color={s.bg} textColor={s.c} style={{ minWidth: 90, justifyContent: 'center' }}>{s.label}</Badge>
-              {item.estado === 'proximo' && (
+              <Badge color={s.bg} textColor={s.c} style={{ minWidth: 100, justifyContent: 'center' }}>{s.label}</Badge>
+              {item.esVep && item.estado !== 'pagado' && (
                 <Btn variant="primary" style={{ padding: '8px 15px', fontSize: 13 }} onClick={() => navigate('vep')}>Generar VEP</Btn>
               )}
             </div>
@@ -85,7 +124,9 @@ function WebVencimientos({ navigate }) {
         <Icon name="bell" size={18} color={DS.colors.primary} />
         <div>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: DS.colors.text }}>Recordatorios activos</div>
-          <div style={{ fontSize: 12.5, color: DS.colors.textMuted, marginTop: 1 }}>Recibís un aviso por email 5 días antes de cada vencimiento.</div>
+          <div style={{ fontSize: 12.5, color: DS.colors.textMuted, marginTop: 1 }}>
+            Recibís un aviso por email 5 días antes de cada vencimiento. Las fechas ajustan automáticamente por fines de semana.
+          </div>
         </div>
       </Card>
     </WebContent>
