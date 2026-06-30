@@ -1,6 +1,6 @@
 
-// MonoClaro Web — Desktop Layout Components (sober)
-// ==================================================
+// AreaGo Web — Desktop Layout Components
+// =======================================
 // Reuses window.DS, Badge, ProgressBar, Field, Btn, Icon
 
 // ── Sidebar ─────────────────────────────────────────────
@@ -15,44 +15,79 @@ const WEB_NAV = [
 ];
 window.WEB_NAV = WEB_NAV;
 
+// Logotipo AreaGo: corchetes angulares (representan el "área acotada") + wordmark en Sora
+function AreaGoLogo({ size = 30 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+      {/* Isotipo: cuatro corchetes + flecha verde (simplificado en SVG inline) */}
+      <div style={{
+        width: size, height: size, borderRadius: 7,
+        background: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 20 20" fill="none">
+          {/* Corchetes */}
+          <path d="M5 2H2v5" stroke={DS.colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M2 13v5h3" stroke={DS.colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M15 2h3v5" stroke={DS.colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M18 13v5h-3" stroke={DS.colors.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          {/* Flecha verde "Go" */}
+          <path d="M7 10h7M11 7l3 3-3 3" stroke={DS.colors.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {/* Wordmark */}
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: DS.fontDisplay, letterSpacing: -0.4, lineHeight: 1 }}>
+          Area<span style={{ color: DS.colors.accent }}>Go</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Sidebar({ active, onNavigate, userName, categoria, estudio }) {
   return (
     <div style={{
       width: 244, flexShrink: 0, height: '100%',
-      background: DS.colors.primary,
+      background: DS.colors.primaryDeep,  // #1E2636 — navy profundo según manual
       display: 'flex', flexDirection: 'column',
     }}>
       {/* Logo */}
-      <div style={{ padding: '22px 22px 20px', display: 'flex', alignItems: 'center', gap: 11, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 7,
-          background: '#fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, fontWeight: 800, color: DS.colors.primary, letterSpacing: -0.5,
-        }}>M</div>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: -0.2 }}>MonoClaro</div>
-          <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: 0.8, marginTop: 1 }}>{(estudio || 'ESTUDIO CONTABLE').toUpperCase()}</div>
+      <div style={{
+        padding: '20px 20px 18px',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+      }}>
+        <AreaGoLogo />
+        <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 0.9, marginTop: 10 }}>
+          {(estudio || 'ESTUDIO CONTABLE').toUpperCase()}
         </div>
       </div>
 
       {/* Nav */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
         {WEB_NAV.map(item => {
           const isActive = active === item.id;
           return (
             <div key={item.id} onClick={() => onNavigate(item.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 11,
-              padding: '9px 12px', borderRadius: 7, marginBottom: 2,
-              cursor: 'pointer', transition: 'background 0.12s',
-              background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 11px', borderRadius: 8, marginBottom: 1,
+              cursor: 'pointer', transition: 'background 0.1s',
+              background: isActive ? 'rgba(255,255,255,0.09)' : 'transparent',
+              // Indicador verde izquierdo en ítem activo (regla del verde: acción/avance)
+              borderLeft: isActive ? `2px solid ${DS.colors.accent}` : '2px solid transparent',
             }}
-            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
             onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
-              <Icon name={item.icon} size={18} color={isActive ? '#fff' : 'rgba(255,255,255,0.55)'} strokeWidth={isActive ? 1.9 : 1.6} />
+              <Icon
+                name={item.icon}
+                size={17}
+                color={isActive ? '#fff' : 'rgba(255,255,255,0.5)'}
+                strokeWidth={isActive ? 1.9 : 1.6}
+              />
               <span style={{
                 fontSize: 13.5, fontWeight: isActive ? 600 : 500,
-                color: isActive ? '#fff' : 'rgba(255,255,255,0.7)',
+                color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
               }}>{item.label}</span>
             </div>
           );
@@ -61,21 +96,25 @@ function Sidebar({ active, onNavigate, userName, categoria, estudio }) {
 
       {/* User card */}
       <div onClick={() => onNavigate('perfil')} style={{
-        margin: 12, padding: '11px 12px', borderRadius: 9,
-        background: active === 'perfil' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
+        margin: '0 10px 12px', padding: '10px 11px', borderRadius: 9,
+        background: active === 'perfil' ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid rgba(255,255,255,0.07)`,
         display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+        transition: 'background 0.1s',
       }}>
         <div style={{
-          width: 34, height: 34, borderRadius: 7,
-          background: 'rgba(255,255,255,0.15)',
+          width: 33, height: 33, borderRadius: 7,
+          background: DS.colors.accent + '33',  // verde con 20% opacidad
+          border: `1px solid ${DS.colors.accent}55`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, color: '#fff', fontWeight: 700, flexShrink: 0,
+          fontSize: 12.5, color: DS.colors.accent, fontWeight: 700, flexShrink: 0,
+          fontFamily: DS.fontDisplay,
         }}>{userName.split(' ').map(w => w[0]).join('').slice(0, 2)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Categoría {categoria}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>Cat. {categoria} · Activa</div>
         </div>
-        <Icon name="chevron" size={15} color="rgba(255,255,255,0.4)" />
+        <Icon name="chevron" size={14} color="rgba(255,255,255,0.35)" />
       </div>
     </div>
   );
@@ -87,23 +126,26 @@ function Topbar({ title, subtitle, onNotif, actions }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '16px 32px', borderBottom: `1px solid ${DS.colors.border}`,
+      padding: '15px 32px', borderBottom: `1px solid ${DS.colors.border}`,
       background: DS.colors.card, flexShrink: 0,
     }}>
       <div>
-        <div style={{ fontSize: 19, fontWeight: 700, color: DS.colors.text, letterSpacing: -0.3 }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12.5, color: DS.colors.textMuted, marginTop: 2 }}>{subtitle}</div>}
+        <div style={{
+          fontSize: 18, fontWeight: 700, color: DS.colors.text, letterSpacing: -0.3,
+          fontFamily: DS.fontDisplay,
+        }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 12, color: DS.colors.textMuted, marginTop: 2 }}>{subtitle}</div>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {actions}
         <div onClick={onNotif} style={{
-          width: 38, height: 38, borderRadius: 8, position: 'relative',
+          width: 36, height: 36, borderRadius: DS.radius.md, position: 'relative',
           background: DS.colors.bg, border: `1px solid ${DS.colors.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
         }}>
-          <Icon name="bell" size={17} color={DS.colors.textMid} />
+          <Icon name="bell" size={16} color={DS.colors.textMid} />
           <span style={{
-            position: 'absolute', top: 8, right: 9, width: 7, height: 7,
+            position: 'absolute', top: 8, right: 9, width: 6, height: 6,
             borderRadius: 99, background: DS.colors.danger, border: '1.5px solid #fff',
           }} />
         </div>
@@ -129,21 +171,23 @@ window.WebContent = WebContent;
 function StatTile({ label, value, sub, icon, accent = DS.colors.primary, trend }) {
   return (
     <Card style={{ padding: '17px 19px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{
-          width: 34, height: 34, borderRadius: 8,
+          width: 32, height: 32, borderRadius: DS.radius.md,
           background: DS.colors.bg, border: `1px solid ${DS.colors.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><Icon name={icon} size={17} color={accent} /></div>
+        }}><Icon name={icon} size={16} color={accent} /></div>
         {trend && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 12, fontWeight: 600, color: trend.up ? DS.colors.success : DS.colors.danger }}>
-            <Icon name={trend.up ? 'trending' : 'trending'} size={13} color={trend.up ? DS.colors.success : DS.colors.danger} /> {trend.value}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11.5, fontWeight: 600, color: trend.up ? DS.colors.accent : DS.colors.danger }}>
+            <Icon name="trending" size={12} color={trend.up ? DS.colors.accent : DS.colors.danger} /> {trend.value}
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11.5, color: DS.colors.textMuted, fontWeight: 600, letterSpacing: 0.3 }}>{label}</div>
-      <div style={{ fontSize: 25, fontWeight: 700, color: DS.colors.text, marginTop: 4, letterSpacing: -0.6 }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: DS.colors.textMuted, marginTop: 4 }}>{sub}</div>}
+      {/* Eyebrow label — pequeño, uppercase, tracking amplio */}
+      <div style={{ fontSize: 11, fontWeight: 700, color: DS.colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+      {/* Valor — Sora para display numbers */}
+      <div style={{ fontSize: 24, fontWeight: 700, color: DS.colors.text, letterSpacing: -0.5, fontFamily: DS.fontDisplay }}>{value}</div>
+      {sub && <div style={{ fontSize: 11.5, color: DS.colors.textMuted, marginTop: 4 }}>{sub}</div>}
     </Card>
   );
 }
@@ -153,9 +197,10 @@ window.StatTile = StatTile;
 function WebSection({ children, action, onAction, style = {} }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 4, ...style }}>
-      <span style={{ fontSize: 14.5, fontWeight: 700, color: DS.colors.text, letterSpacing: -0.2 }}>{children}</span>
+      {/* Sora para section headings — jerarquía visual */}
+      <span style={{ fontSize: 14, fontWeight: 700, color: DS.colors.text, letterSpacing: -0.2, fontFamily: DS.fontDisplay }}>{children}</span>
       {action && (
-        <span onClick={onAction} style={{ fontSize: 12.5, color: DS.colors.primaryMid, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+        <span onClick={onAction} style={{ fontSize: 12.5, color: DS.colors.accent, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
           {action}
         </span>
       )}
@@ -169,12 +214,12 @@ function Modal({ children, onClose, width = 480 }) {
   return (
     <div onClick={onClose} style={{
       position: 'absolute', inset: 0, zIndex: 50,
-      background: 'rgba(15,23,42,0.4)',
+      background: 'rgba(30,38,54,0.45)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: DS.colors.card, borderRadius: 14, width: '100%', maxWidth: width,
-        maxHeight: '88%', overflowY: 'auto', boxShadow: '0 24px 60px rgba(15,23,42,0.25)',
+        background: DS.colors.card, borderRadius: DS.radius.lg, width: '100%', maxWidth: width,
+        maxHeight: '88%', overflowY: 'auto', boxShadow: '0 24px 60px rgba(30,38,54,0.3)',
       }}>
         {children}
       </div>
@@ -191,14 +236,14 @@ function ModalHeader({ title, subtitle, onClose }) {
       padding: '20px 24px 16px', borderBottom: `1px solid ${DS.colors.border}`,
     }}>
       <div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: DS.colors.text }}>{title}</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: DS.colors.text, fontFamily: DS.fontDisplay }}>{title}</div>
         {subtitle && <div style={{ fontSize: 12.5, color: DS.colors.textMuted, marginTop: 2 }}>{subtitle}</div>}
       </div>
       <div onClick={onClose} style={{
-        width: 30, height: 30, borderRadius: 7, background: DS.colors.bg,
+        width: 30, height: 30, borderRadius: DS.radius.sm, background: DS.colors.bg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', flexShrink: 0,
-      }}><Icon name="x" size={15} color={DS.colors.textMid} /></div>
+      }}><Icon name="x" size={14} color={DS.colors.textMid} /></div>
     </div>
   );
 }
@@ -209,17 +254,21 @@ function DataTable({ columns, rows, renderCell }) {
   const gridCols = columns.map(c => c.width || '1fr').join(' ');
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, padding: '12px 20px', background: DS.colors.bg, borderBottom: `1px solid ${DS.colors.border}` }}>
+      {/* Header */}
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols, padding: '11px 20px', background: DS.colors.bg, borderBottom: `1px solid ${DS.colors.border}` }}>
         {columns.map(c => (
-          <span key={c.key} style={{ fontSize: 11, fontWeight: 700, color: DS.colors.textMuted, letterSpacing: 0.4, textAlign: c.align || 'left' }}>{c.label.toUpperCase()}</span>
+          <span key={c.key} style={{ fontSize: 10.5, fontWeight: 700, color: DS.colors.textMuted, letterSpacing: 0.5, textAlign: c.align || 'left', textTransform: 'uppercase' }}>{c.label}</span>
         ))}
       </div>
       {rows.map((row, i) => (
         <div key={i} style={{
           display: 'grid', gridTemplateColumns: gridCols,
-          padding: '13px 20px', alignItems: 'center',
+          padding: '12px 20px', alignItems: 'center',
           borderBottom: i < rows.length - 1 ? `1px solid ${DS.colors.border}` : 'none',
-        }}>
+          transition: 'background 0.1s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = DS.colors.bg}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           {columns.map(c => (
             <div key={c.key} style={{ textAlign: c.align || 'left' }}>{renderCell(row, c.key)}</div>
           ))}

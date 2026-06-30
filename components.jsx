@@ -1,30 +1,42 @@
 
-// MonoClaro — Shared Components & Design System
-// ================================================
+// AreaGo — Shared Components & Design System
+// ============================================
+// Paleta y tokens del Manual de Marca AreaGo
 
 const DS = {
   colors: {
-    primary:      'oklch(0.34 0.055 255)',
-    primaryMid:   'oklch(0.46 0.07 255)',
-    primaryLight: 'oklch(0.955 0.012 255)',
-    primaryBg:    'oklch(0.975 0.006 255)',
-    accent:       'oklch(0.48 0.07 230)',
-    accentLight:  'oklch(0.955 0.015 230)',
-    success:      'oklch(0.50 0.09 160)',
-    successLight: 'oklch(0.96 0.022 160)',
-    warning:      'oklch(0.60 0.10 70)',
-    warningLight: 'oklch(0.96 0.03 75)',
-    danger:       'oklch(0.50 0.13 25)',
-    dangerLight:  'oklch(0.96 0.025 25)',
-    text:         'oklch(0.24 0.018 255)',
-    textMid:      'oklch(0.44 0.018 255)',
-    textMuted:    'oklch(0.60 0.014 255)',
-    border:       'oklch(0.915 0.006 255)',
-    card:         '#ffffff',
-    bg:           'oklch(0.975 0.004 255)',
+    // Azules/Navy — identidad principal
+    primary:      '#2A3548',   // Navy — fondos primarios, texto principal de acción
+    primaryDeep:  '#1E2636',   // Navy profundo — sidebar, overlays oscuros
+    primaryMid:   '#475779',   // Navy medio — estados hover en texto navy
+    primaryLight: '#EEF1F7',   // Navy muy suave — bg de íconos, chips neutros
+
+    // Verde — avance, acción, éxito (máx 10% de pantalla)
+    accent:       '#2B9C6E',
+    accentLight:  '#E6F4EE',
+
+    // Semánticos
+    success:      '#2B9C6E',
+    successLight: '#E6F4EE',
+    warning:      '#C98A2E',
+    warningLight: '#FAF1E3',
+    danger:       '#B23B3B',
+    dangerLight:  '#F8E9E9',
+
+    // Neutros de texto
+    text:         '#2A3343',
+    textMid:      '#5A6577',
+    textMuted:    '#8A93A3',
+
+    // Superficie
+    border:       '#E6EAF0',
+    card:         '#FFFFFF',
+    bg:           '#F8FAFC',   // Paper — fondo general
   },
-  radius: { sm: 6, md: 9, lg: 12, xl: 16, pill: 999 },
-  font: "'Inter', -apple-system, sans-serif",
+  radius: { sm: 6, md: 9, lg: 14, xl: 18, pill: 999 },
+  font:        "'Inter', -apple-system, sans-serif",
+  fontDisplay: "'Sora', 'Inter', sans-serif",     // Para títulos y display
+  fontMono:    "'JetBrains Mono', monospace",
 };
 window.DS = DS;
 
@@ -47,10 +59,10 @@ function Card({ children, style = {}, onClick }) {
   return (
     <div onClick={onClick} style={{
       background: DS.colors.card,
-      borderRadius: DS.radius.lg,
+      borderRadius: DS.radius.lg,   // 14px según manual
       padding: '16px',
       border: `1px solid ${DS.colors.border}`,
-      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+      boxShadow: '0 1px 3px rgba(42,53,72,0.06)',
       cursor: onClick ? 'pointer' : 'default',
       ...style
     }}>{children}</div>
@@ -59,7 +71,7 @@ function Card({ children, style = {}, onClick }) {
 window.Card = Card;
 
 // ── Progress Bar ────────────────────────────────────────
-function ProgressBar({ value, max, color = DS.colors.primary, bg = DS.colors.primaryLight, height = 8 }) {
+function ProgressBar({ value, max, color = DS.colors.accent, bg = DS.colors.accentLight, height = 8 }) {
   const pct = Math.min(100, Math.round((value / max) * 100));
   const barColor = pct > 85 ? DS.colors.danger : pct > 65 ? DS.colors.warning : color;
   return (
@@ -78,14 +90,15 @@ window.ProgressBar = ProgressBar;
 function Field({ label, value, onChange, placeholder, type = 'text', prefix, readOnly }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: DS.colors.textMid, marginBottom: 5, letterSpacing: 0.3 }}>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: DS.colors.textMid, marginBottom: 5, letterSpacing: 0.4, textTransform: 'uppercase' }}>
         {label}
       </div>
       <div style={{
         display: 'flex', alignItems: 'center',
         border: `1.5px solid ${DS.colors.border}`,
         borderRadius: DS.radius.md, background: readOnly ? DS.colors.bg : '#fff',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        transition: 'border-color 0.15s',
       }}>
         {prefix && (
           <span style={{ padding: '0 10px', color: DS.colors.textMuted, fontSize: 14, borderRight: `1px solid ${DS.colors.border}` }}>
@@ -100,7 +113,7 @@ function Field({ label, value, onChange, placeholder, type = 'text', prefix, rea
           readOnly={readOnly}
           style={{
             flex: 1, border: 'none', outline: 'none',
-            padding: '11px 12px', fontSize: 14,
+            padding: '10px 12px', fontSize: 14,
             color: DS.colors.text, background: 'transparent',
             fontFamily: DS.font
           }}
@@ -115,11 +128,11 @@ window.Field = Field;
 function SectionTitle({ children, action, onAction }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: DS.colors.textMid, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: DS.colors.textMid, letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: DS.font }}>
         {children}
       </span>
       {action && (
-        <span onClick={onAction} style={{ fontSize: 12, color: DS.colors.primary, fontWeight: 600, cursor: 'pointer' }}>
+        <span onClick={onAction} style={{ fontSize: 12, color: DS.colors.accent, fontWeight: 600, cursor: 'pointer' }}>
           {action}
         </span>
       )}
@@ -128,23 +141,24 @@ function SectionTitle({ children, action, onAction }) {
 }
 window.SectionTitle = SectionTitle;
 
-// ── Primary Button ──────────────────────────────────────
+// ── Button ──────────────────────────────────────────────
+// Variantes del manual: primary (navy), secondary (verde claro), outline (borde sutil), ghost, danger, success (verde)
 function Btn({ children, onClick, variant = 'primary', style = {}, disabled = false }) {
   const variants = {
     primary:   { background: DS.colors.primary, color: '#fff', border: 'none' },
-    secondary: { background: DS.colors.primaryLight, color: DS.colors.primary, border: 'none' },
-    outline:   { background: 'transparent', color: DS.colors.primary, border: `1.5px solid ${DS.colors.primary}` },
+    secondary: { background: DS.colors.accentLight, color: DS.colors.accent, border: 'none' },
+    outline:   { background: 'transparent', color: DS.colors.primary, border: `1.5px solid ${DS.colors.border}` },
     ghost:     { background: 'transparent', color: DS.colors.primary, border: 'none' },
     danger:    { background: DS.colors.danger, color: '#fff', border: 'none' },
-    success:   { background: DS.colors.success, color: '#fff', border: 'none' },
+    success:   { background: DS.colors.accent, color: '#fff', border: 'none' },
   };
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-      borderRadius: DS.radius.md, padding: '13px 20px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+      borderRadius: DS.radius.md, padding: '11px 18px',
       fontSize: 14, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
-      fontFamily: DS.font, transition: 'opacity 0.15s',
+      fontFamily: DS.font, transition: 'opacity 0.15s, filter 0.15s',
       ...variants[variant], ...style
     }}>{children}</button>
   );
@@ -203,7 +217,7 @@ function Header({ title, subtitle, onBack, right, dark }) {
       {onBack && (
         <div onClick={onBack} style={{
           display: 'flex', alignItems: 'center', gap: 4,
-          color: dark ? 'rgba(255,255,255,0.8)' : DS.colors.primary,
+          color: dark ? 'rgba(255,255,255,0.8)' : DS.colors.accent,
           fontSize: 13, fontWeight: 600, marginBottom: 8, cursor: 'pointer'
         }}>
           ← Volver
@@ -213,7 +227,8 @@ function Header({ title, subtitle, onBack, right, dark }) {
         <div>
           <div style={{
             fontSize: 20, fontWeight: 700,
-            color: dark ? '#fff' : DS.colors.text, lineHeight: 1.2
+            color: dark ? '#fff' : DS.colors.text, lineHeight: 1.2,
+            fontFamily: DS.fontDisplay,
           }}>{title}</div>
           {subtitle && <div style={{
             fontSize: 13, color: dark ? 'rgba(255,255,255,0.7)' : DS.colors.textMuted, marginTop: 3
@@ -263,12 +278,11 @@ function BottomNav({ active, onNavigate }) {
           }}>
             <div style={{
               fontSize: 20, lineHeight: 1,
-              color: isActive ? DS.colors.primary : DS.colors.textMuted,
-              filter: isActive ? 'none' : 'opacity(0.5)',
+              color: isActive ? DS.colors.accent : DS.colors.textMuted,
             }}>{item.icon}</div>
             <div style={{
               fontSize: 10, fontWeight: isActive ? 700 : 500,
-              color: isActive ? DS.colors.primary : DS.colors.textMuted,
+              color: isActive ? DS.colors.accent : DS.colors.textMuted,
               letterSpacing: 0.2,
             }}>{item.label}</div>
           </div>
