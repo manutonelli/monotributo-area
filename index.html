@@ -86,7 +86,11 @@ function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [screen, setScreen] = React.useState('dashboard');
   const [invoices, setInvoices] = React.useState(INITIAL_FACTURAS);
-  const navigate = (to) => setScreen(to);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const bp = useBreakpoint();
+  const isDesktop = bp === 'lg';
+
+  const navigate = (to) => { setScreen(to); setDrawerOpen(false); };
   const { userName, cuit, categoria, estudio } = tweaks;
   const meta = SCREEN_META[screen] || SCREEN_META.dashboard;
 
@@ -111,15 +115,35 @@ function App() {
   return (
     <>
       <div style={{ height: '100vh', display: 'flex', overflow: 'hidden' }}>
-        <Sidebar active={screen} onNavigate={navigate} userName={userName} categoria={categoria} estudio={estudio} />
+        {isDesktop && (
+          <Sidebar active={screen} onNavigate={navigate} userName={userName} categoria={categoria} estudio={estudio} />
+        )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
-          <Topbar title={meta.title} subtitle={meta.subtitle} onNotif={() => {}}
-            actions={screen === 'dashboard' ? (
-              <Btn variant="primary" onClick={() => navigate('factura')}><Icon name="plus" size={16} color="#fff" /> Nueva factura</Btn>
-            ) : null} />
+          {isDesktop ? (
+            <Topbar title={meta.title} subtitle={meta.subtitle} onNotif={() => {}}
+              actions={screen === 'dashboard' ? (
+                <Btn variant="primary" onClick={() => navigate('factura')}><Icon name="plus" size={16} color="#fff" /> Nueva factura</Btn>
+              ) : null} />
+          ) : (
+            <MobileHeader title={meta.title} onMenu={() => setDrawerOpen(true)} onNotif={() => {}} />
+          )}
           {renderScreen()}
+          {!isDesktop && <BottomNav active={screen} onNavigate={navigate} />}
         </div>
       </div>
+
+      {/* Mobile/tablet sidebar drawer */}
+      {!isDesktop && drawerOpen && (
+        <div onClick={() => setDrawerOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(30,38,54,0.5)',
+          display: 'flex',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 280, height: '100%', flexShrink: 0 }}>
+            <Sidebar active={screen} onNavigate={navigate} userName={userName} categoria={categoria} estudio={estudio} />
+          </div>
+        </div>
+      )}
 
       <TweaksPanel tweaks={tweaks} setTweak={setTweak}>
         <TweakSection title="Contribuyente">

@@ -292,3 +292,20 @@ function BottomNav({ active, onNavigate }) {
   );
 }
 window.BottomNav = BottomNav;
+
+// ── Breakpoint Hook ──────────────────────────────────────
+// sm < 640px | md 640–1023px | lg ≥ 1024px
+function useBreakpoint() {
+  const get = () => {
+    const w = window.innerWidth;
+    return w < 640 ? 'sm' : w < 1024 ? 'md' : 'lg';
+  };
+  const [bp, setBp] = React.useState(get);
+  React.useEffect(() => {
+    const h = () => setBp(get());
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
+  return bp;
+}
+window.useBreakpoint = useBreakpoint;

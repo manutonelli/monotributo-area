@@ -4,6 +4,7 @@
 
 // ── DASHBOARD ───────────────────────────────────────────
 function WebDashboard({ navigate, userName, categoria, invoices }) {
+  const bp = useBreakpoint();
   const TOPES_CAT = { A: 2109906, B: 3150950, C: 4201265, D: 5251580, E: 6302896, F: 7878620, G: 9454344 };
   const tope = TOPES_CAT[categoria] || 5251580;
   const facturado = invoices.reduce((sum, f) => sum + f.monto, 0);
@@ -38,9 +39,10 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
         padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 13,
         marginBottom: 22, border: `1px solid ${DS.colors.border}`,
         borderLeft: `3px solid ${DS.colors.warning}`,
+        flexWrap: 'wrap',
       }}>
         <Icon name="alert" size={19} color={DS.colors.warning} />
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
           <span style={{ fontSize: 13.5, fontWeight: 600, color: DS.colors.text }}>Vencimiento próximo · </span>
           <span style={{ fontSize: 13.5, color: DS.colors.textMid }}>Pago del monotributo de Mayo 2026 ($42.830) vence en 5 días</span>
         </div>
@@ -48,7 +50,7 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
       </div>
 
       {/* Stat tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 26 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? 'repeat(2, 1fr)' : bp === 'md' ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 14, marginBottom: 26 }}>
         <StatTile label="FACTURADO 2026" value={fmt(facturado)} sub={`${pct}% del tope anual`} icon="dollar" accent={DS.colors.primary} trend={{ up: true, value: '12%' }} />
         <StatTile label="CATEGORÍA ACTUAL" value={`Cat. ${categoria}`} sub="Cuota $42.830 / mes" icon="fileText" accent={DS.colors.accent} />
         <StatTile label="FACTURAS DEL MES" value={facturasMes.length} sub={`${fmt(totalMes)} emitido`} icon="invoice" accent={DS.colors.success} />
@@ -56,7 +58,7 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
       </div>
 
       {/* Two columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'lg' ? '1.5fr 1fr' : '1fr', gap: 24 }}>
         {/* Left */}
         <div>
           {/* Tope card */}
@@ -168,6 +170,7 @@ window.WebDashboard = WebDashboard;
 
 // ── FACTURACIÓN ─────────────────────────────────────────
 function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
+  const bp = useBreakpoint();
   const [showModal, setShowModal] = React.useState(false);
   const [step, setStep] = React.useState(1);
   const [search, setSearch] = React.useState('');
@@ -343,16 +346,16 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
 
   return (
     <WebContent>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? '1fr' : 'repeat(3, 1fr)', gap: 14, marginBottom: 22 }}>
         <StatTile label="EMITIDO ESTE MES" value={totalMes >= 1000000 ? `$${(totalMes/1000000).toFixed(2)}M` : `$${(totalMes/1000).toFixed(0)}K`} sub={`${facturasMes.length} comprobantes`} icon="trending" accent={DS.colors.success} />
         <StatTile label="PROMEDIO POR FACTURA" value={`$${(promedio/1000).toFixed(1)}K`} sub="Promedio histórico" icon="chart" accent={DS.colors.primary} />
         <StatTile label="ÚLTIMO COMPROBANTE" value={`Nº ${nextNumInt - 1}`} sub={invoices[0] ? `Emitido el ${invoices[0].fecha}` : '—'} icon="invoice" accent={DS.colors.accent} />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: bp === 'sm' ? 'flex-start' : 'center', marginBottom: 14, gap: 12, flexDirection: bp === 'sm' ? 'column' : 'row' }}>
         <WebSection style={{ margin: 0 }}>Historial de facturas</WebSection>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', width: bp === 'sm' ? '100%' : 'auto' }}>
+          <div style={{ position: 'relative', flex: bp === 'sm' ? 1 : 'none' }}>
             <Icon name="search" size={15} color={DS.colors.textMuted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
             <input
               value={search}
@@ -361,12 +364,13 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
               style={{
                 paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
                 borderRadius: 8, border: `1.5px solid ${DS.colors.border}`, fontSize: 13,
-                fontFamily: DS.font, color: DS.colors.text, outline: 'none', width: 240,
-                background: DS.colors.card,
+                fontFamily: DS.font, color: DS.colors.text, outline: 'none',
+                width: bp === 'sm' ? '100%' : 240,
+                background: DS.colors.card, boxSizing: 'border-box',
               }}
             />
           </div>
-          <Btn variant="primary" onClick={() => setShowModal(true)}><Icon name="plus" size={16} color="#fff" /> Nueva factura</Btn>
+          <Btn variant="primary" onClick={() => setShowModal(true)} style={{ flexShrink: 0 }}><Icon name="plus" size={16} color="#fff" />{bp !== 'sm' ? ' Nueva factura' : ''}</Btn>
         </div>
       </div>
 
@@ -397,7 +401,7 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? '1fr' : '1fr 1fr', gap: 14 }}>
                   <div>
                     <Field label="CUIT / DNI (opcional)" value={form.cuit} onChange={v => set('cuit', v)} placeholder="20-12345678-3" />
                     {form.cuit.replace(/\D/g,'').length === 11 && (
@@ -486,6 +490,7 @@ window.WebFactura = WebFactura;
 
 // ── GENERAR VEP ─────────────────────────────────────────
 function WebVep({ navigate }) {
+  const bp = useBreakpoint();
   const [generated, setGenerated] = React.useState(false);
   const [periodo, setPeriodo] = React.useState('05/2026');
   const [copied, setCopied] = React.useState(false);
@@ -534,7 +539,7 @@ function WebVep({ navigate }) {
 
   return (
     <WebContent maxWidth={880}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? '1fr' : '1fr 1fr', gap: 24, alignItems: 'start' }}>
         <div>
           <WebSection>Período a pagar</WebSection>
           <Card style={{ marginBottom: 20, padding: '10px 16px' }}>

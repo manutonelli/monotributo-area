@@ -155,11 +155,45 @@ function Topbar({ title, subtitle, onNotif, actions }) {
 }
 window.Topbar = Topbar;
 
+// ── Mobile Header ───────────────────────────────────────
+function MobileHeader({ title, onMenu, onNotif }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '12px 16px', background: DS.colors.card,
+      borderBottom: `1px solid ${DS.colors.border}`, flexShrink: 0,
+    }}>
+      <div onClick={onMenu} style={{
+        width: 38, height: 38, borderRadius: DS.radius.md, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', background: DS.colors.bg, border: `1px solid ${DS.colors.border}`, flexShrink: 0,
+      }}>
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+          <rect y="0" width="18" height="2" rx="1" fill={DS.colors.textMid}/>
+          <rect y="6" width="18" height="2" rx="1" fill={DS.colors.textMid}/>
+          <rect y="12" width="18" height="2" rx="1" fill={DS.colors.textMid}/>
+        </svg>
+      </div>
+      <span style={{ fontSize: 15, fontWeight: 700, color: DS.colors.text, fontFamily: DS.fontDisplay }}>{title}</span>
+      <div onClick={onNotif} style={{
+        width: 38, height: 38, borderRadius: DS.radius.md, position: 'relative',
+        background: DS.colors.bg, border: `1px solid ${DS.colors.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+      }}>
+        <Icon name="bell" size={16} color={DS.colors.textMid} />
+        <span style={{ position: 'absolute', top: 8, right: 9, width: 6, height: 6, borderRadius: 99, background: DS.colors.danger, border: '1.5px solid #fff' }} />
+      </div>
+    </div>
+  );
+}
+window.MobileHeader = MobileHeader;
+
 // ── Web Content Wrapper ─────────────────────────────────
 function WebContent({ children, maxWidth = 1120 }) {
+  const bp = useBreakpoint();
+  const pad = bp === 'sm' ? '16px 16px 90px' : bp === 'md' ? '20px 24px 90px' : '26px 32px 60px';
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: DS.colors.bg }}>
-      <div style={{ maxWidth, margin: '0 auto', padding: '26px 32px 60px' }}>
+      <div style={{ maxWidth, margin: '0 auto', padding: pad }}>
         {children}
       </div>
     </div>
@@ -211,15 +245,23 @@ window.WebSection = WebSection;
 
 // ── Modal ───────────────────────────────────────────────
 function Modal({ children, onClose, width = 480 }) {
+  const bp = useBreakpoint();
+  const isMobile = bp === 'sm';
   return (
     <div onClick={onClose} style={{
-      position: 'absolute', inset: 0, zIndex: 50,
+      position: 'fixed', inset: 0, zIndex: 200,
       background: 'rgba(30,38,54,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      display: 'flex',
+      alignItems: isMobile ? 'flex-end' : 'center',
+      justifyContent: 'center',
+      padding: isMobile ? 0 : 24,
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: DS.colors.card, borderRadius: DS.radius.lg, width: '100%', maxWidth: width,
-        maxHeight: '88%', overflowY: 'auto', boxShadow: '0 24px 60px rgba(30,38,54,0.3)',
+        background: DS.colors.card,
+        borderRadius: isMobile ? `${DS.radius.lg}px ${DS.radius.lg}px 0 0` : DS.radius.lg,
+        width: '100%', maxWidth: isMobile ? '100%' : width,
+        maxHeight: isMobile ? '92%' : '88%', overflowY: 'auto',
+        boxShadow: '0 24px 60px rgba(30,38,54,0.3)',
       }}>
         {children}
       </div>
@@ -251,29 +293,35 @@ window.ModalHeader = ModalHeader;
 
 // ── Data Table ──────────────────────────────────────────
 function DataTable({ columns, rows, renderCell }) {
+  const bp = useBreakpoint();
   const gridCols = columns.map(c => c.width || '1fr').join(' ');
+  const minW = columns.length >= 5 ? 560 : 'auto';
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, padding: '11px 20px', background: DS.colors.bg, borderBottom: `1px solid ${DS.colors.border}` }}>
-        {columns.map(c => (
-          <span key={c.key} style={{ fontSize: 10.5, fontWeight: 700, color: DS.colors.textMuted, letterSpacing: 0.5, textAlign: c.align || 'left', textTransform: 'uppercase' }}>{c.label}</span>
-        ))}
-      </div>
-      {rows.map((row, i) => (
-        <div key={i} style={{
-          display: 'grid', gridTemplateColumns: gridCols,
-          padding: '12px 20px', alignItems: 'center',
-          borderBottom: i < rows.length - 1 ? `1px solid ${DS.colors.border}` : 'none',
-          transition: 'background 0.1s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.background = DS.colors.bg}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          {columns.map(c => (
-            <div key={c.key} style={{ textAlign: c.align || 'left' }}>{renderCell(row, c.key)}</div>
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ minWidth: minW }}>
+          {/* Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: gridCols, padding: '11px 20px', background: DS.colors.bg, borderBottom: `1px solid ${DS.colors.border}` }}>
+            {columns.map(c => (
+              <span key={c.key} style={{ fontSize: 10.5, fontWeight: 700, color: DS.colors.textMuted, letterSpacing: 0.5, textAlign: c.align || 'left', textTransform: 'uppercase' }}>{c.label}</span>
+            ))}
+          </div>
+          {rows.map((row, i) => (
+            <div key={i} style={{
+              display: 'grid', gridTemplateColumns: gridCols,
+              padding: '12px 20px', alignItems: 'center',
+              borderBottom: i < rows.length - 1 ? `1px solid ${DS.colors.border}` : 'none',
+              transition: 'background 0.1s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = DS.colors.bg}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              {columns.map(c => (
+                <div key={c.key} style={{ textAlign: c.align || 'left' }}>{renderCell(row, c.key)}</div>
+              ))}
+            </div>
           ))}
         </div>
-      ))}
+      </div>
     </Card>
   );
 }

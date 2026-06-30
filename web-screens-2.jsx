@@ -4,6 +4,7 @@
 
 // ── VENCIMIENTOS ────────────────────────────────────────
 function WebVencimientos({ navigate }) {
+  const bp = useBreakpoint();
   const [mes, setMes] = React.useState(4);
   const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const data = {
@@ -31,7 +32,7 @@ function WebVencimientos({ navigate }) {
   return (
     <WebContent maxWidth={960}>
       {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'sm' ? '1fr' : 'repeat(3, 1fr)', gap: 14, marginBottom: 22 }}>
         <StatTile label="PAGADOS EN EL PERÍODO" value={items.filter(i => i.estado === 'pagado').length} sub="Al día con AFIP" icon="check" accent={DS.colors.success} />
         <StatTile label="PENDIENTES" value={items.filter(i => ['pendiente','proximo'].includes(i.estado)).length} sub="Requieren acción" icon="clock" accent={DS.colors.warning} />
         <StatTile label="PROGRAMADOS" value={items.filter(i => i.estado === 'futuro').length} sub="Próximos meses" icon="calendar" accent={DS.colors.primary} />
@@ -94,6 +95,7 @@ window.WebVencimientos = WebVencimientos;
 
 // ── TOPES ───────────────────────────────────────────────
 function WebTopes({ navigate, categoria, invoices }) {
+  const bp = useBreakpoint();
   const TOPES_CAT = { A: 2109906, B: 3150950, C: 4201265, D: 5251580, E: 6302896, F: 7878620, G: 9454344 };
   const facturado = (invoices || []).reduce((sum, f) => sum + f.monto, 0);
   const tope = TOPES_CAT[categoria] || 5251580;
@@ -107,7 +109,7 @@ function WebTopes({ navigate, categoria, invoices }) {
 
   return (
     <WebContent maxWidth={1000}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'lg' ? '1.3fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
         <div>
           {/* Main */}
           <Card style={{ padding: 0, overflow: 'hidden', marginBottom: 20 }}>
@@ -191,6 +193,7 @@ window.WebTopes = WebTopes;
 
 // ── RECATEGORIZACIÓN ────────────────────────────────────
 function WebRecategorizacion({ navigate, categoria, onCategoriaChange, invoices }) {
+  const bp = useBreakpoint();
   const [step, setStep] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const run = () => { setLoading(true); setTimeout(() => { setLoading(false); setStep(1); }, 1600); };
@@ -314,6 +317,7 @@ window.WebRecategorizacion = WebRecategorizacion;
 
 // ── MI CONTADOR ─────────────────────────────────────────
 function WebDerivar({ navigate, estudio }) {
+  const bp = useBreakpoint();
   const [selected, setSelected] = React.useState(null);
   const [sent, setSent] = React.useState(false);
   const [msg, setMsg] = React.useState('');
@@ -351,7 +355,7 @@ function WebDerivar({ navigate, estudio }) {
 
   return (
     <WebContent maxWidth={900}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'lg' ? '1.5fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
         <div>
           <Card style={{ marginBottom: 18, borderLeft: `3px solid ${DS.colors.primary}`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <Icon name="briefcase" size={19} color={DS.colors.primary} style={{ marginTop: 1 }} />
@@ -418,6 +422,7 @@ window.WebDerivar = WebDerivar;
 
 // ── PERFIL ──────────────────────────────────────────────
 function WebPerfil({ navigate, userName, cuit, categoria, estudio }) {
+  const bp = useBreakpoint();
   const [notif, setNotif] = React.useState(true);
   const [bio, setBio] = React.useState(false);
   const [email, setEmail] = React.useState(true);
@@ -472,7 +477,7 @@ function WebPerfil({ navigate, userName, cuit, categoria, estudio }) {
 
   return (
     <WebContent maxWidth={900}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: bp === 'lg' ? '1fr 1fr' : '1fr', gap: 24, alignItems: 'start' }}>
         <div>
           {/* Identity */}
           <Card style={{ marginBottom: 20, display: 'flex', gap: 15, alignItems: 'center' }}>
