@@ -118,7 +118,36 @@ function AdminPanel({ token, adminUser, onLogout }) {
   const [selected, setSelected] = React.useState(null); // cuit del cliente detalle
 
   // Crear usuario form
-  const [form, setForm] = React.useState({ email: '', password: '', cuit: '', nombre: '', categoria: 'C', estudio: '', domicilio: '', actividad: '' });
+  const ACTIVIDADES = [
+    'Servicios profesionales',
+    'Desarrollo de software',
+    'Consultoría y asesoramiento',
+    'Diseño gráfico y multimedia',
+    'Comunicación y marketing',
+    'Contabilidad y auditoría',
+    'Servicios jurídicos',
+    'Arquitectura e ingeniería',
+    'Salud y medicina',
+    'Psicología y psicopedagogía',
+    'Educación y capacitación',
+    'Comercio minorista',
+    'Comercio mayorista',
+    'Servicios gastronómicos',
+    'Transporte y logística',
+    'Construcción y remodelación',
+    'Servicios de limpieza',
+    'Fotografía y video',
+    'Música y artes escénicas',
+    'Escritura y periodismo',
+    'Traducción e interpretación',
+    'Turismo y hotelería',
+    'Actividad agropecuaria',
+    'Otros servicios',
+  ];
+
+  const emptyForm = { email: '', password: '', cuit: '', nombre: '', categoria: 'C', estudio: '',
+    calle: '', numero: '', piso: '', depto: '', localidad: '', provincia: 'Buenos Aires', cp: '', actividad: 'Servicios profesionales' };
+  const [form, setForm] = React.useState(emptyForm);
   const [formError, setFormError] = React.useState('');
   const [formOk, setFormOk] = React.useState('');
   const [formLoading, setFormLoading] = React.useState(false);
@@ -141,14 +170,18 @@ function AdminPanel({ token, adminUser, onLogout }) {
   const createUser = async (e) => {
     e.preventDefault();
     setFormError(''); setFormOk(''); setFormLoading(true);
+    // Armar domicilio completo desde los campos separados
+    const partes = [form.calle, form.numero, form.piso && `Piso ${form.piso}`, form.depto && `Depto ${form.depto}`, form.localidad, form.provincia, form.cp].filter(Boolean);
+    const domicilio = partes.join(', ');
     try {
       const r = await fetch(`${API_BASE}/admin/usuarios`, {
-        method: 'POST', headers: authH, body: JSON.stringify(form),
+        method: 'POST', headers: authH,
+        body: JSON.stringify({ ...form, domicilio }),
       });
       const data = await r.json();
       if (!r.ok) { setFormError(data.error || 'Error al crear usuario'); return; }
       setFormOk(`Usuario creado correctamente (CUIT ${data.cuit})`);
-      setForm({ email: '', password: '', cuit: '', nombre: '', categoria: 'C', estudio: '', domicilio: '', actividad: '' });
+      setForm(emptyForm);
       loadData();
     } catch { setFormError('Error de conexión'); }
     finally { setFormLoading(false); }
@@ -281,38 +314,101 @@ function AdminPanel({ token, adminUser, onLogout }) {
 
         {/* Tab: crear usuario */}
         {tab === 'crear' && (
-          <div style={{ maxWidth: 560 }}>
+          <div style={{ maxWidth: 640 }}>
             <div style={{ background: '#fff', borderRadius: 14, padding: 28, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
               <div style={{ fontWeight: 700, fontSize: 17, color: '#1E2636', marginBottom: 20, fontFamily: 'Sora, sans-serif' }}>
                 Nuevo cliente + usuario
               </div>
               <form onSubmit={createUser}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+
+                {/* Sección: Datos personales */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.8, marginBottom: 10 }}>DATOS PERSONALES</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
                   {[
-                    { key: 'nombre', label: 'Nombre completo', span: 2, placeholder: 'María García' },
-                    { key: 'cuit', label: 'CUIT', placeholder: '27-34567890-1' },
-                    { key: 'categoria', label: 'Categoría', type: 'select' },
-                    { key: 'email', label: 'Email de acceso', placeholder: 'maria@email.com', type: 'email' },
-                    { key: 'password', label: 'Contraseña inicial', placeholder: '••••••••', type: 'password' },
-                    { key: 'estudio', label: 'Estudio contable', placeholder: 'Nombre del estudio', span: 2 },
-                    { key: 'domicilio', label: 'Domicilio fiscal', placeholder: 'Calle 123, Ciudad', span: 2 },
-                    { key: 'actividad', label: 'Actividad', placeholder: 'Servicios profesionales', span: 2 },
-                  ].map(({ key, label, span, placeholder, type }) => (
+                    { key: 'nombre', label: 'Nombre completo', span: 2, placeholder: 'María García', required: true },
+                    { key: 'cuit', label: 'CUIT', placeholder: '27-34567890-1', required: true },
+                    { key: 'categoria', label: 'Categoría', type: 'catSelect' },
+                  ].map(({ key, label, span, placeholder, type, required }) => (
                     <div key={key} style={{ gridColumn: span === 2 ? '1 / -1' : undefined }}>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>{label}</label>
-                      {type === 'select' ? (
-                        <select value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                          style={{ ...inpStyle }}>
+                      {type === 'catSelect' ? (
+                        <select value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={inpStyle}>
                           {['A','B','C','D','E','F','G'].map(c => <option key={c} value={c}>Categoría {c}</option>)}
                         </select>
                       ) : (
-                        <input type={type || 'text'} value={form[key]} placeholder={placeholder}
-                          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                          required={['nombre','cuit','email','password'].includes(key)}
-                          style={inpStyle} />
+                        <input type="text" value={form[key]} placeholder={placeholder} required={required}
+                          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={inpStyle} />
                       )}
                     </div>
                   ))}
+                </div>
+
+                {/* Sección: Actividad */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.8, marginBottom: 10 }}>ACTIVIDAD ECONÓMICA</div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Actividad principal</label>
+                  <select value={form.actividad} onChange={e => setForm(f => ({ ...f, actividad: e.target.value }))} style={inpStyle}>
+                    {ACTIVIDADES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+
+                {/* Sección: Domicilio fiscal */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.8, marginBottom: 10 }}>DOMICILIO FISCAL</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Calle</label>
+                    <input type="text" value={form.calle} placeholder="Av. Corrientes" onChange={e => setForm(f => ({ ...f, calle: e.target.value }))} style={inpStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Número</label>
+                    <input type="text" value={form.numero} placeholder="1234" onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} style={inpStyle} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Piso</label>
+                    <input type="text" value={form.piso} placeholder="3" onChange={e => setForm(f => ({ ...f, piso: e.target.value }))} style={inpStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Depto</label>
+                    <input type="text" value={form.depto} placeholder="B" onChange={e => setForm(f => ({ ...f, depto: e.target.value }))} style={inpStyle} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14, marginBottom: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Localidad / Ciudad</label>
+                    <input type="text" value={form.localidad} placeholder="Ciudad Autónoma de Buenos Aires" onChange={e => setForm(f => ({ ...f, localidad: e.target.value }))} style={inpStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Código postal</label>
+                    <input type="text" value={form.cp} placeholder="1043" onChange={e => setForm(f => ({ ...f, cp: e.target.value }))} style={inpStyle} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Provincia</label>
+                  <select value={form.provincia} onChange={e => setForm(f => ({ ...f, provincia: e.target.value }))} style={inpStyle}>
+                    {['Buenos Aires','CABA','Catamarca','Chaco','Chubut','Córdoba','Corrientes','Entre Ríos','Formosa','Jujuy','La Pampa','La Rioja','Mendoza','Misiones','Neuquén','Río Negro','Salta','San Juan','San Luis','Santa Cruz','Santa Fe','Santiago del Estero','Tierra del Fuego','Tucumán'].map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+
+                {/* Sección: Estudio */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.8, marginBottom: 10 }}>ESTUDIO CONTABLE</div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Nombre del estudio</label>
+                  <input type="text" value={form.estudio} placeholder="Estudio Contable XYZ" onChange={e => setForm(f => ({ ...f, estudio: e.target.value }))} style={inpStyle} />
+                </div>
+
+                {/* Sección: Acceso */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.8, marginBottom: 10 }}>ACCESO AL SISTEMA</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Email</label>
+                    <input type="email" value={form.email} placeholder="maria@email.com" required onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={inpStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Contraseña inicial</label>
+                    <input type="password" value={form.password} placeholder="••••••••" required onChange={e => setForm(f => ({ ...f, password: e.target.value }))} style={inpStyle} />
+                  </div>
                 </div>
 
                 {formError && (
@@ -330,7 +426,7 @@ function AdminPanel({ token, adminUser, onLogout }) {
                   background: formLoading ? '#94A3B8' : '#2B9C6E', color: '#fff',
                   fontSize: 15, fontWeight: 700, fontFamily: 'Sora, sans-serif', cursor: formLoading ? 'not-allowed' : 'pointer',
                 }}>
-                  {formLoading ? 'Creando...' : 'Crear usuario'}
+                  {formLoading ? 'Creando...' : 'Crear cliente y usuario'}
                 </button>
               </form>
             </div>
