@@ -320,7 +320,7 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
   ];
 
   const renderCell = (row, key) => {
-    if (key === 'num') return <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.primaryMid }}>FC {row.tipo || 'C'} {row.num}</span>;
+    if (key === 'num') return <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.primary }}>FC {row.tipo || 'C'} {row.num}</span>;
     if (key === 'cliente') return <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.text }}>{row.cliente}</span>;
     if (key === 'cuit') return <span style={{ fontSize: 13, color: DS.colors.textMid }}>{row.cuit}</span>;
     if (key === 'fecha') return <span style={{ fontSize: 13, color: DS.colors.textMid }}>{row.fecha}</span>;
