@@ -508,7 +508,7 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token })
               <ModalHeader title="Confirmar factura" subtitle="Revisá los datos antes de emitir" onClose={reset} />
               <div style={{ padding: '20px 24px' }}>
                 <div style={{ background: DS.colors.bg, borderRadius: 10, padding: '16px 18px', marginBottom: 16, border: `1px solid ${DS.colors.border}` }}>
-                  {[['Comprobante', `FC ${form.tipo} ${nextNumFormatted}`], ['Tipo', `Factura ${form.tipo}`], ['Operación', ['','Productos','Servicios','Prod. + Servicios'][form.conceptoTipo] || 'Servicios'], ['Receptor', form.razon || 'Consumidor Final'], ['CUIT', form.cuit || '—'], ['Concepto', form.concepto], ['Condición IVA', form.condicion]].map(([k, v]) => (
+                  {[['Comprobante', `FC ${form.tipo} 0001-${String(nextNumInt).padStart(8,'0')}`], ['Tipo', `Factura ${form.tipo}`], ['Operación', ['','Productos','Servicios','Prod. + Servicios'][form.conceptoTipo] || 'Servicios'], ['Receptor', form.razon || 'Consumidor Final'], ['CUIT', form.cuit || '—'], ['Concepto', form.concepto], ['Condición IVA', form.condicion]].map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${DS.colors.border}` }}>
                       <span style={{ fontSize: 13, color: DS.colors.textMuted }}>{k}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: DS.colors.text }}>{v}</span>
