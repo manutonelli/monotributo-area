@@ -44,8 +44,8 @@
 </template>
 
 <script type="text/babel">
-// URL del backend — cambiar a la URL de producción cuando se despliegue
-const API_BASE = 'http://localhost:3001/api';
+// URL relativa: funciona en local (mismo puerto) y en producción (mismo servidor)
+const API_BASE = '/api';
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "userName": "María García",
