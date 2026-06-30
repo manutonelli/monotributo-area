@@ -421,11 +421,30 @@ function WebDerivar({ navigate, estudio }) {
 window.WebDerivar = WebDerivar;
 
 // ── PERFIL ──────────────────────────────────────────────
-function WebPerfil({ navigate, userName, cuit, categoria, estudio }) {
+function WebPerfil({ navigate, userName, cuit, categoria, estudio, onPerfilUpdate }) {
   const bp = useBreakpoint();
   const [notif, setNotif] = React.useState(true);
   const [bio, setBio] = React.useState(false);
   const [email, setEmail] = React.useState(true);
+  const [savingPrefs, setSavingPrefs] = React.useState(false);
+
+  const savePreference = async (key, value) => {
+    const cuitNum = (cuit || '').replace(/\D/g, '');
+    if (!cuitNum) return;
+    setSavingPrefs(true);
+    try {
+      await fetch(`${API_BASE}/clientes/${cuitNum}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      });
+    } catch {}
+    setSavingPrefs(false);
+  };
+
+  const toggleNotif = (v) => { setNotif(v); savePreference('notif_push', v); };
+  const toggleEmail = (v) => { setEmail(v); savePreference('notif_email', v); };
+  const toggleBio   = (v) => { setBio(v);   savePreference('notif_bio', v);   };
 
   // Certificado ARCA
   const [certStatus, setCertStatus] = React.useState(null); // null=loading, {}=loaded
@@ -599,9 +618,9 @@ function WebPerfil({ navigate, userName, cuit, categoria, estudio }) {
           <WebSection>Preferencias</WebSection>
           <Card>
             {[
-              { label: 'Notificaciones por email', sub: 'Avisos de vencimientos y topes', val: email, set: setEmail },
-              { label: 'Notificaciones push', sub: 'Alertas en el navegador', val: notif, set: setNotif },
-              { label: 'Acceso con biometría', sub: 'Huella o Face ID', val: bio, set: setBio },
+              { label: 'Notificaciones por email', sub: 'Avisos de vencimientos y topes', val: email, set: toggleEmail },
+              { label: 'Notificaciones push', sub: 'Alertas en el navegador', val: notif, set: toggleNotif },
+              { label: 'Acceso con biometría', sub: 'Huella o Face ID', val: bio, set: toggleBio },
             ].map((item, i, arr) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: i < arr.length - 1 ? `1px solid ${DS.colors.border}` : 'none' }}>
                 <div>

@@ -227,10 +227,13 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
             cuit: emisorCuit,
             ptoVta: 1,
             tipo: form.tipo,
-            concepto: 2, // Servicios
+            concepto: 2,
             docTipo,
             docNro,
             importeTotal: Number(form.monto),
+            clienteNombre: form.razon || null,
+            clienteCuit: form.cuit || null,
+            conceptoTexto: form.concepto || null,
           }),
         });
         const data = await res.json();
@@ -489,52 +492,88 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
 window.WebFactura = WebFactura;
 
 // ── GENERAR VEP ─────────────────────────────────────────
-function WebVep({ navigate }) {
+function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep }) {
   const bp = useBreakpoint();
-  const [generated, setGenerated] = React.useState(false);
+  const [currentVep, setCurrentVep] = React.useState(null); // VEP generado en esta sesión
   const [periodo, setPeriodo] = React.useState('05/2026');
   const [copied, setCopied] = React.useState(false);
-  const vepCode = '0110250427000000000012893745000000004283000';
-  const vepNum = '72.845.293';
+  const [generating, setGenerating] = React.useState(false);
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(vepCode).catch(() => {
+  const CUOTAS = { A: 28420, B: 31580, C: 42830, D: 52340, E: 63150, F: 78600, G: 94350 };
+  const DETALLE_CAT = {
+    A: { integrado: 12020, obraSocial: 11800, jubilatorio: 4600 },
+    B: { integrado: 14880, obraSocial: 11800, jubilatorio: 4900 },
+    C: { integrado: 18430, obraSocial: 15800, jubilatorio: 8600 },
+    D: { integrado: 24740, obraSocial: 18800, jubilatorio: 8800 },
+    E: { integrado: 33550, obraSocial: 20800, jubilatorio: 8800 },
+    F: { integrado: 48200, obraSocial: 21600, jubilatorio: 8800 },
+    G: { integrado: 62950, obraSocial: 22600, jubilatorio: 8800 },
+  };
+  const monto = CUOTAS[categoria] || CUOTAS.C;
+  const detalle = DETALLE_CAT[categoria] || DETALLE_CAT.C;
+
+  // Períodos: los 2 anteriores como pagados (o los que hay en veps), el actual y el próximo
+  const periodosPagados = new Set((veps || []).filter(v => v.estado === 'pagado').map(v => v.periodo));
+  const periodosGenerados = new Set((veps || []).map(v => v.periodo));
+  const periodos = ['03/2026', '04/2026', '05/2026', '06/2026'].map(p => ({
+    p,
+    estado: periodosPagados.has(p) ? 'pagado' : periodosGenerados.has(p) ? 'pendiente' : 'futuro',
+  }));
+
+  const generarVep = async () => {
+    setGenerating(true);
+    try {
+      const cuitNum = (cuitEmisor || '').replace(/\D/g, '');
+      const res = await fetch(`${API_BASE}/veps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cuit: cuitNum, periodo, categoria }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      addVep && addVep(data);
+      setCurrentVep(data);
+    } catch {
+      // Sin backend: generar localmente
+      const num = `${Math.floor(Math.random()*9e5+1e5)}.${Math.floor(Math.random()*900+100)}`;
+      const code = `0110${periodo.slice(3,7).slice(2)}${periodo.slice(0,2)}${(cuitEmisor||'').replace(/\D/g,'').slice(0,8)}${Math.floor(Math.random()*9e9+1e9)}${String(monto).padStart(11,'0')}`;
+      setCurrentVep({ numero: num, codigo: code, monto, vencimiento: `20/${periodo}`, estado: 'pendiente' });
+    }
+    setGenerating(false);
+  };
+
+  const copyCode = (code) => {
+    navigator.clipboard.writeText(code).catch(() => {
       const ta = document.createElement('textarea');
-      ta.value = vepCode;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+      ta.value = code; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
     });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const downloadVep = () => {
+  const downloadVep = (vep) => {
     const content = [
-      `VEP Nº ${vepNum}`,
+      `VEP Nº ${vep.numero}`,
       '='.repeat(50),
       `Período: ${periodo}`,
-      `Impuesto integrado: $18.430`,
-      `Obra social: $15.800`,
-      `Aporte jubilatorio: $8.600`,
+      `Impuesto integrado: $${detalle.integrado.toLocaleString('es-AR')}`,
+      `Obra social: $${detalle.obraSocial.toLocaleString('es-AR')}`,
+      `Aporte jubilatorio: $${detalle.jubilatorio.toLocaleString('es-AR')}`,
       '='.repeat(50),
-      `TOTAL: $42.830`,
+      `TOTAL: $${monto.toLocaleString('es-AR')}`,
       '',
-      `Código de pago electrónico:`,
-      vepCode,
+      'Código de pago electrónico:',
+      vep.codigo,
       '',
-      `Válido hasta: 20/05/2026 23:59 hs`,
+      `Válido hasta: ${vep.vencimiento} 23:59 hs`,
     ].join('\n');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const a = document.createElement('a'); a.href = url;
     a.download = `vep-${periodo.replace('/', '-')}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
   return (
@@ -543,10 +582,10 @@ function WebVep({ navigate }) {
         <div>
           <WebSection>Período a pagar</WebSection>
           <Card style={{ marginBottom: 20, padding: '10px 16px' }}>
-            {[['04/2026', 'Pagado', 'pagado'], ['05/2026', 'Pendiente', 'pendiente'], ['06/2026', 'No vencido', 'futuro']].map(([p, label, est], i, arr) => (
-              <div key={p} onClick={() => { if (est !== 'pagado') { setPeriodo(p); setGenerated(false); } }} style={{
+            {periodos.map(({ p, estado }, i, arr) => (
+              <div key={p} onClick={() => { if (estado !== 'pagado') { setPeriodo(p); setCurrentVep(null); } }} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '13px 6px', cursor: est === 'pagado' ? 'default' : 'pointer',
+                padding: '13px 6px', cursor: estado === 'pagado' ? 'default' : 'pointer',
                 borderBottom: i < arr.length - 1 ? `1px solid ${DS.colors.border}` : 'none',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
@@ -556,31 +595,33 @@ function WebVep({ navigate }) {
                     background: periodo === p ? DS.colors.primary : '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>{periodo === p && <div style={{ width: 7, height: 7, borderRadius: 99, background: '#fff' }} />}</div>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: est === 'pagado' ? DS.colors.textMuted : DS.colors.text }}>{p}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: estado === 'pagado' ? DS.colors.textMuted : DS.colors.text }}>{p}</span>
                 </div>
-                <Badge color={est === 'pagado' ? DS.colors.successLight : est === 'pendiente' ? DS.colors.warningLight : DS.colors.bg}
-                  textColor={est === 'pagado' ? DS.colors.success : est === 'pendiente' ? DS.colors.warning : DS.colors.textMuted}>{label}</Badge>
+                <Badge
+                  color={estado === 'pagado' ? DS.colors.successLight : estado === 'pendiente' ? DS.colors.warningLight : DS.colors.bg}
+                  textColor={estado === 'pagado' ? DS.colors.success : estado === 'pendiente' ? DS.colors.warning : DS.colors.textMuted}
+                >{estado === 'pagado' ? 'Pagado' : estado === 'pendiente' ? 'Generado' : 'Sin VEP'}</Badge>
               </div>
             ))}
           </Card>
 
-          <WebSection>Detalle de la cuota</WebSection>
+          <WebSection>Detalle de la cuota · Cat. {categoria}</WebSection>
           <Card>
-            {[['Impuesto integrado', '$18.430'], ['Obra social', '$15.800'], ['Aporte jubilatorio', '$8.600']].map(([k, v]) => (
+            {[['Impuesto integrado', detalle.integrado], ['Obra social', detalle.obraSocial], ['Aporte jubilatorio', detalle.jubilatorio]].map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${DS.colors.border}` }}>
                 <span style={{ fontSize: 13, color: DS.colors.textMuted }}>{k}</span>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{v}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>${v.toLocaleString('es-AR')}</span>
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12 }}>
               <span style={{ fontSize: 14.5, fontWeight: 700 }}>Total a pagar</span>
-              <span style={{ fontSize: 19, fontWeight: 700, color: DS.colors.text }}>$42.830</span>
+              <span style={{ fontSize: 19, fontWeight: 700, color: DS.colors.text }}>${monto.toLocaleString('es-AR')}</span>
             </div>
           </Card>
         </div>
 
         <div>
-          {!generated ? (
+          {!currentVep ? (
             <>
               <WebSection>Generar volante</WebSection>
               <Card style={{ textAlign: 'center', padding: '30px 24px' }}>
@@ -589,11 +630,13 @@ function WebVep({ navigate }) {
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: DS.colors.text }}>VEP para período {periodo}</div>
                 <div style={{ fontSize: 12.5, color: DS.colors.textMuted, margin: '5px 0' }}>Volante Electrónico de Pago</div>
-                <div style={{ fontSize: 27, fontWeight: 700, color: DS.colors.text, margin: '10px 0 16px' }}>$42.830</div>
+                <div style={{ fontSize: 27, fontWeight: 700, color: DS.colors.text, margin: '10px 0 16px' }}>${monto.toLocaleString('es-AR')}</div>
                 <div style={{ background: DS.colors.bg, borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 12, color: DS.colors.textMid, border: `1px solid ${DS.colors.border}` }}>
-                  Vence el <strong>20/05/2026</strong> · quedan 23 días
+                  Vence el <strong>20/{periodo}</strong>
                 </div>
-                <Btn variant="primary" style={{ width: '100%' }} onClick={() => setGenerated(true)}>Generar VEP</Btn>
+                <Btn variant="primary" style={{ width: '100%' }} disabled={generating} onClick={generarVep}>
+                  {generating ? 'Generando…' : 'Generar VEP'}
+                </Btn>
               </Card>
             </>
           ) : (
@@ -605,18 +648,18 @@ function WebVep({ navigate }) {
                     <Icon name="check" size={24} color={DS.colors.success} strokeWidth={2.2} />
                   </div>
                   <div style={{ fontSize: 11.5, fontWeight: 600, color: DS.colors.textMuted, letterSpacing: 0.4 }}>NÚMERO DE VEP</div>
-                  <div style={{ fontSize: 23, fontWeight: 700, color: DS.colors.text, letterSpacing: 1 }}>{vepNum}</div>
-                  <div style={{ fontSize: 12, color: DS.colors.textMuted, marginTop: 2 }}>Válido hasta 20/05/2026 23:59 hs</div>
+                  <div style={{ fontSize: 23, fontWeight: 700, color: DS.colors.text, letterSpacing: 1 }}>{currentVep.numero}</div>
+                  <div style={{ fontSize: 12, color: DS.colors.textMuted, marginTop: 2 }}>Válido hasta {currentVep.vencimiento} 23:59 hs</div>
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: DS.colors.textMuted, letterSpacing: 0.4, marginBottom: 6 }}>CÓDIGO DE PAGO ELECTRÓNICO</div>
-                <div style={{ background: DS.colors.bg, borderRadius: 7, padding: '10px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: DS.colors.text, wordBreak: 'break-all', lineHeight: 1.6, marginBottom: 12, border: `1px solid ${DS.colors.border}` }}>{vepCode}</div>
-                <Btn variant="secondary" style={{ width: '100%' }} onClick={copyCode}>
+                <div style={{ background: DS.colors.bg, borderRadius: 7, padding: '10px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: DS.colors.text, wordBreak: 'break-all', lineHeight: 1.6, marginBottom: 12, border: `1px solid ${DS.colors.border}` }}>{currentVep.codigo}</div>
+                <Btn variant="secondary" style={{ width: '100%' }} onClick={() => copyCode(currentVep.codigo)}>
                   {copied ? <><Icon name="check" size={15} color={DS.colors.success} /> Copiado</> : <><Icon name="copy" size={15} color={DS.colors.primary} /> Copiar código</>}
                 </Btn>
               </Card>
               <div style={{ display: 'flex', gap: 12 }}>
-                <Btn variant="outline" style={{ flex: 1 }} onClick={downloadVep}><Icon name="download" size={15} color={DS.colors.primary} /> Descargar</Btn>
-                <Btn variant="primary" style={{ flex: 1 }} onClick={() => setGenerated(false)}>Nuevo VEP</Btn>
+                <Btn variant="outline" style={{ flex: 1 }} onClick={() => downloadVep(currentVep)}><Icon name="download" size={15} color={DS.colors.primary} /> Descargar</Btn>
+                <Btn variant="primary" style={{ flex: 1 }} onClick={() => setCurrentVep(null)}>Nuevo VEP</Btn>
               </div>
             </>
           )}

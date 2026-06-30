@@ -54,21 +54,12 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "estudio": "Estudio Contable XYZ"
 }/*EDITMODE-END*/;
 
-const INITIAL_FACTURAS = [
-  { num: '0001-00000124', cliente: 'Tech Solutions S.A.', cuit: '30-71234567-8', monto: 185000, fecha: '29/04/2026', tipo: 'C', concepto: 'Servicios de desarrollo web' },
-  { num: '0001-00000123', cliente: 'Consultora ABC S.R.L.', cuit: '30-69876543-2', monto: 320000, fecha: '28/04/2026', tipo: 'C', concepto: 'Consultoría estratégica' },
-  { num: '0001-00000122', cliente: 'García & Asociados', cuit: '27-34567890-1', monto: 95000, fecha: '22/04/2026', tipo: 'C', concepto: 'Asesoramiento contable' },
-  { num: '0001-00000121', cliente: 'Estudio Creativo', cuit: '30-71112223-3', monto: 210000, fecha: '18/04/2026', tipo: 'C', concepto: 'Diseño y comunicación' },
-  { num: '0001-00000120', cliente: 'Consumidor Final', cuit: '—', monto: 45000, fecha: '15/04/2026', tipo: 'C', concepto: 'Servicios varios' },
-  { num: '0001-00000119', cliente: 'Marketing Digital S.A.', cuit: '30-70009998-7', monto: 280000, fecha: '10/04/2026', tipo: 'C', concepto: 'Campaña digital abril' },
-  { num: '0001-00000118', cliente: 'Inversiones del Sur S.A.', cuit: '30-60123456-4', monto: 150000, fecha: '05/04/2026', tipo: 'C', concepto: 'Servicios profesionales' },
-  { num: '0001-00000117', cliente: 'Constructora Norte S.R.L.', cuit: '30-55678901-2', monto: 420000, fecha: '28/03/2026', tipo: 'C', concepto: 'Asesoramiento técnico' },
-  { num: '0001-00000116', cliente: 'Tech Solutions S.A.', cuit: '30-71234567-8', monto: 195000, fecha: '20/03/2026', tipo: 'C', concepto: 'Mantenimiento sistema' },
-  { num: '0001-00000115', cliente: 'Consumidor Final', cuit: '—', monto: 38000, fecha: '15/03/2026', tipo: 'C', concepto: 'Servicios varios' },
-  { num: '0001-00000114', cliente: 'Consultora ABC S.R.L.', cuit: '30-69876543-2', monto: 280000, fecha: '10/03/2026', tipo: 'C', concepto: 'Consultoría mensual marzo' },
-  { num: '0001-00000113', cliente: 'García & Asociados', cuit: '27-34567890-1', monto: 112000, fecha: '03/03/2026', tipo: 'C', concepto: 'Análisis financiero' },
-  { num: '0001-00000112', cliente: 'Marketing Digital S.A.', cuit: '30-70009998-7', monto: 310000, fecha: '25/02/2026', tipo: 'C', concepto: 'Campaña digital febrero' },
-  { num: '0001-00000111', cliente: 'Estudio Creativo', cuit: '30-71112223-3', monto: 200000, fecha: '18/02/2026', tipo: 'C', concepto: 'Rediseño corporativo' },
+// Fallback usado cuando el backend no está disponible
+const DEMO_FACTURAS = [
+  { num: '0001-00000114', cliente: 'Tech Solutions S.A.',    cuit: '30-71234567-8', monto: 185000, fecha: '29/04/2026', tipo: 'C', concepto: 'Servicios de desarrollo web' },
+  { num: '0001-00000113', cliente: 'Consultora ABC S.R.L.',  cuit: '30-69876543-2', monto: 320000, fecha: '28/04/2026', tipo: 'C', concepto: 'Consultoría estratégica' },
+  { num: '0001-00000112', cliente: 'García & Asociados',     cuit: '27-34567890-1', monto: 95000,  fecha: '22/04/2026', tipo: 'C', concepto: 'Asesoramiento contable' },
+  { num: '0001-00000111', cliente: 'Consumidor Final',       cuit: '—',             monto: 45000,  fecha: '15/04/2026', tipo: 'C', concepto: 'Servicios varios' },
 ];
 
 const SCREEN_META = {
@@ -85,7 +76,9 @@ const SCREEN_META = {
 function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [screen, setScreen] = React.useState('dashboard');
-  const [invoices, setInvoices] = React.useState(INITIAL_FACTURAS);
+  const [invoices, setInvoices] = React.useState([]);
+  const [veps, setVeps] = React.useState([]);
+  const [loadingData, setLoadingData] = React.useState(true);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const bp = useBreakpoint();
   const isDesktop = bp === 'lg';
@@ -93,12 +86,38 @@ function App() {
   const navigate = (to) => { setScreen(to); setDrawerOpen(false); };
   const { userName, cuit, categoria, estudio } = tweaks;
   const meta = SCREEN_META[screen] || SCREEN_META.dashboard;
+  const cuitNum = (cuit || '').replace(/\D/g, '');
+
+  // Carga inicial de datos desde el backend
+  React.useEffect(() => {
+    if (!cuitNum) { setInvoices(DEMO_FACTURAS); setLoadingData(false); return; }
+
+    Promise.all([
+      fetch(`${API_BASE}/clientes/${cuitNum}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${API_BASE}/facturas/${cuitNum}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${API_BASE}/veps/${cuitNum}`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([profile, facturas, vepsData]) => {
+      if (profile) {
+        if (profile.nombre)    setTweak('userName', profile.nombre);
+        if (profile.categoria) setTweak('categoria', profile.categoria);
+        if (profile.estudio)   setTweak('estudio', profile.estudio);
+      }
+      setInvoices(facturas && facturas.length ? facturas : DEMO_FACTURAS);
+      if (vepsData) setVeps(vepsData);
+    }).finally(() => setLoadingData(false));
+  }, [cuitNum]);
 
   const addInvoice = React.useCallback((inv) => setInvoices(prev => [inv, ...prev]), []);
+  const addVep = React.useCallback((vep) => setVeps(prev => [vep, ...prev]), []);
   const onCategoriaChange = React.useCallback((cat) => setTweak('categoria', cat), [setTweak]);
+  const onPerfilUpdate = React.useCallback((updates) => {
+    if (updates.nombre)    setTweak('userName', updates.nombre);
+    if (updates.categoria) setTweak('categoria', updates.categoria);
+    if (updates.estudio)   setTweak('estudio', updates.estudio);
+  }, [setTweak]);
 
   const renderScreen = () => {
-    const p = { navigate, userName, cuit, categoria, estudio, invoices, addInvoice, onCategoriaChange };
+    const p = { navigate, userName, cuit, categoria, estudio, invoices, addInvoice, veps, addVep, onCategoriaChange, onPerfilUpdate, loadingData };
     switch (screen) {
       case 'dashboard':        return <WebDashboard {...p} />;
       case 'factura':          return <WebFactura {...p} />;
