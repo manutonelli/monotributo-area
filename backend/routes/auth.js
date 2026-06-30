@@ -16,11 +16,14 @@ router.post('/login', async (req, res) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return res.status(401).json({ error: 'Email o contraseña incorrectos' });
 
-  const { data: usuario } = await supabase
+  const { data: usuario, error: usuarioErr } = await supabase
     .from('usuarios')
     .select('cuit, is_admin')
     .eq('id', data.user.id)
     .single();
+
+  if (usuarioErr) console.error('[auth/login] usuarios query error:', usuarioErr);
+  console.log('[auth/login] usuario row:', usuario);
 
   let perfil = null;
   if (usuario?.cuit) {
