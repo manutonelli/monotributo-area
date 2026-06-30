@@ -46,7 +46,7 @@ function AreaGoLogo({ size = 30 }) {
   );
 }
 
-function Sidebar({ active, onNavigate, userName, categoria, estudio }) {
+function Sidebar({ active, onNavigate, userName, categoria, estudio, onLogout }) {
   return (
     <div style={{
       width: 244, flexShrink: 0, height: '100%',
@@ -116,6 +116,19 @@ function Sidebar({ active, onNavigate, userName, categoria, estudio }) {
         </div>
         <Icon name="chevron" size={14} color="rgba(255,255,255,0.35)" />
       </div>
+      {onLogout && (
+        <div onClick={onLogout} style={{
+          margin: '0 10px 12px', padding: '8px 11px', borderRadius: 9,
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+          color: 'rgba(255,255,255,0.45)', fontSize: 13, transition: 'background 0.1s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+          <Icon name="logout" size={15} color="rgba(255,255,255,0.45)" />
+          Cerrar sesión
+        </div>
+      )}
     </div>
   );
 }

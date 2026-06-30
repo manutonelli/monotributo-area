@@ -8,13 +8,19 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// API routes
-app.use('/api/clientes',  require('./routes/clientes'));
-app.use('/api/facturas',  require('./routes/facturas'));
-app.use('/api/veps',      require('./routes/veps'));
-app.use('/api/pagos',     require('./routes/pagos'));
-app.use('/api/cert',      require('./routes/certs'));
-app.use('/api/padron',    require('./routes/padron'));
+const { requireAuth, requireOwnCuit } = require('./middleware/auth');
+
+// API routes — auth (public)
+app.use('/api/auth',      require('./routes/auth'));
+app.use('/api/admin',     require('./routes/admin'));
+
+// API routes — protected
+app.use('/api/clientes',  requireAuth, require('./routes/clientes'));
+app.use('/api/facturas',  requireAuth, require('./routes/facturas'));
+app.use('/api/veps',      requireAuth, require('./routes/veps'));
+app.use('/api/pagos',     requireAuth, require('./routes/pagos'));
+app.use('/api/cert',      requireAuth, require('./routes/certs'));
+app.use('/api/padron',    requireAuth, require('./routes/padron'));
 
 // Health check
 app.get('/api/health', (_, res) => res.json({

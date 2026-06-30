@@ -421,7 +421,7 @@ function WebDerivar({ navigate, estudio }) {
 window.WebDerivar = WebDerivar;
 
 // ── PERFIL ──────────────────────────────────────────────
-function WebPerfil({ navigate, userName, cuit, categoria, estudio, onPerfilUpdate }) {
+function WebPerfil({ navigate, userName, cuit, categoria, estudio, onPerfilUpdate, token }) {
   const bp = useBreakpoint();
   const [notif, setNotif] = React.useState(true);
   const [bio, setBio] = React.useState(false);
@@ -435,7 +435,7 @@ function WebPerfil({ navigate, userName, cuit, categoria, estudio, onPerfilUpdat
     try {
       await fetch(`${API_BASE}/clientes/${cuitNum}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ [key]: value }),
       });
     } catch {}
@@ -459,8 +459,9 @@ function WebPerfil({ navigate, userName, cuit, categoria, estudio, onPerfilUpdat
 
   React.useEffect(() => {
     if (!cuitNum) return;
-    fetch(`${API_BASE}/cert/status/${cuitNum}`)
-      .then(r => r.json())
+    fetch(`${API_BASE}/cert/status/${cuitNum}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(r => r.json())
       .then(d => setCertStatus(d))
       .catch(() => setCertStatus({ active: false }));
   }, [cuitNum]);
@@ -473,7 +474,10 @@ function WebPerfil({ navigate, userName, cuit, categoria, estudio, onPerfilUpdat
     fd.append('password', certPass);
     fd.append('cuit', cuitNum);
     try {
-      const res = await fetch(`${API_BASE}/cert/upload`, { method: 'POST', body: fd });
+      const res = await fetch(`${API_BASE}/cert/upload`, {
+        method: 'POST', body: fd,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setCertStatus({ active: true, cn: data.cn, vencimiento: data.vencimiento, vencido: false });

@@ -169,7 +169,7 @@ function WebDashboard({ navigate, userName, categoria, invoices }) {
 window.WebDashboard = WebDashboard;
 
 // ── FACTURACIÓN ─────────────────────────────────────────
-function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
+function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice, token }) {
   const bp = useBreakpoint();
   const [showModal, setShowModal] = React.useState(false);
   const [step, setStep] = React.useState(1);
@@ -198,7 +198,9 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
     if (cuitLimpio.length !== 11) return;
     setCuitLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/padron/${cuitLimpio}?cuitEmisor=${(cuitEmisor||'').replace(/\D/g,'')}`);
+      const res = await fetch(`${API_BASE}/padron/${cuitLimpio}?cuitEmisor=${(cuitEmisor||'').replace(/\D/g,'')}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const data = await res.json();
         set('razon', data.razonSocial || form.razon);
@@ -222,7 +224,7 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
       if (emisorCuit && emisorCuit.length === 11) {
         const res = await fetch(`${API_BASE}/facturas/cae`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({
             cuit: emisorCuit,
             ptoVta: 1,
@@ -492,7 +494,7 @@ function WebFactura({ navigate, cuit: cuitEmisor, invoices, addInvoice }) {
 window.WebFactura = WebFactura;
 
 // ── GENERAR VEP ─────────────────────────────────────────
-function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep }) {
+function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep, token }) {
   const bp = useBreakpoint();
   const [currentVep, setCurrentVep] = React.useState(null); // VEP generado en esta sesión
   const [periodo, setPeriodo] = React.useState('05/2026');
@@ -526,7 +528,7 @@ function WebVep({ navigate, cuit: cuitEmisor, categoria, veps, addVep }) {
       const cuitNum = (cuitEmisor || '').replace(/\D/g, '');
       const res = await fetch(`${API_BASE}/veps`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ cuit: cuitNum, periodo, categoria }),
       });
       const data = await res.json();

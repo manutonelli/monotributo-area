@@ -16,6 +16,7 @@
   <script type="text/babel" src="web-components.jsx"></script>
   <script type="text/babel" src="web-screens-1.jsx"></script>
   <script type="text/babel" src="web-screens-2.jsx"></script>
+  <script type="text/babel" src="web-login.jsx"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
@@ -44,23 +45,7 @@
 </template>
 
 <script type="text/babel">
-// URL relativa: funciona en local (mismo puerto) y en producción (mismo servidor)
 const API_BASE = '/api';
-
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "userName": "María García",
-  "cuit": "27-34567890-1",
-  "categoria": "C",
-  "estudio": "Estudio Contable XYZ"
-}/*EDITMODE-END*/;
-
-// Fallback usado cuando el backend no está disponible
-const DEMO_FACTURAS = [
-  { num: '0001-00000114', cliente: 'Tech Solutions S.A.',    cuit: '30-71234567-8', monto: 185000, fecha: '29/04/2026', tipo: 'C', concepto: 'Servicios de desarrollo web' },
-  { num: '0001-00000113', cliente: 'Consultora ABC S.R.L.',  cuit: '30-69876543-2', monto: 320000, fecha: '28/04/2026', tipo: 'C', concepto: 'Consultoría estratégica' },
-  { num: '0001-00000112', cliente: 'García & Asociados',     cuit: '27-34567890-1', monto: 95000,  fecha: '22/04/2026', tipo: 'C', concepto: 'Asesoramiento contable' },
-  { num: '0001-00000111', cliente: 'Consumidor Final',       cuit: '—',             monto: 45000,  fecha: '15/04/2026', tipo: 'C', concepto: 'Servicios varios' },
-];
 
 const SCREEN_META = {
   dashboard:        { title: 'Resumen', subtitle: 'Tu situación tributaria de un vistazo' },
@@ -73,51 +58,62 @@ const SCREEN_META = {
   perfil:           { title: 'Mi perfil', subtitle: 'Datos fiscales y preferencias' },
 };
 
-function App() {
-  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+function getStoredSession() {
+  try { return JSON.parse(localStorage.getItem('areago_session') || 'null'); } catch { return null; }
+}
+function storeSession(s) { localStorage.setItem('areago_session', JSON.stringify(s)); }
+function clearSession()   { localStorage.removeItem('areago_session'); }
+
+function authHeader(token) {
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+// ─── ClientApp — app principal del cliente ───────────────────────────────────
+
+function ClientApp({ session, onLogout }) {
+  const { token, user } = session;
   const [screen, setScreen] = React.useState('dashboard');
-  const [invoices, setInvoices] = React.useState([]);
-  const [veps, setVeps] = React.useState([]);
+  const [userName, setUserName]   = React.useState(user.perfil?.nombre || user.email);
+  const [cuit, setCuit]           = React.useState(user.cuit ? user.cuit.replace(/(\d{2})(\d{8})(\d{1})/, '$1-$2-$3') : '');
+  const [categoria, setCategoria] = React.useState(user.perfil?.categoria || 'C');
+  const [estudio, setEstudio]     = React.useState(user.perfil?.estudio || '');
+  const [invoices, setInvoices]   = React.useState([]);
+  const [veps, setVeps]           = React.useState([]);
   const [loadingData, setLoadingData] = React.useState(true);
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [drawerOpen, setDrawerOpen]   = React.useState(false);
   const bp = useBreakpoint();
   const isDesktop = bp === 'lg';
 
   const navigate = (to) => { setScreen(to); setDrawerOpen(false); };
-  const { userName, cuit, categoria, estudio } = tweaks;
   const meta = SCREEN_META[screen] || SCREEN_META.dashboard;
   const cuitNum = (cuit || '').replace(/\D/g, '');
+  const h = authHeader(token);
 
-  // Carga inicial de datos desde el backend
   React.useEffect(() => {
-    if (!cuitNum) { setInvoices(DEMO_FACTURAS); setLoadingData(false); return; }
-
+    if (!cuitNum) { setLoadingData(false); return; }
     Promise.all([
-      fetch(`${API_BASE}/clientes/${cuitNum}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_BASE}/facturas/${cuitNum}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_BASE}/veps/${cuitNum}`).then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([profile, facturas, vepsData]) => {
-      if (profile) {
-        if (profile.nombre)    setTweak('userName', profile.nombre);
-        if (profile.categoria) setTweak('categoria', profile.categoria);
-        if (profile.estudio)   setTweak('estudio', profile.estudio);
-      }
-      setInvoices(facturas && facturas.length ? facturas : DEMO_FACTURAS);
-      if (vepsData) setVeps(vepsData);
+      fetch(`${API_BASE}/facturas/${cuitNum}`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`${API_BASE}/veps/${cuitNum}`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([facturas, vepsData]) => {
+      setInvoices(Array.isArray(facturas) ? facturas : []);
+      setVeps(Array.isArray(vepsData) ? vepsData : []);
     }).finally(() => setLoadingData(false));
-  }, [cuitNum]);
+  }, [cuitNum, token]);
 
   const addInvoice = React.useCallback((inv) => setInvoices(prev => [inv, ...prev]), []);
-  const addVep = React.useCallback((vep) => setVeps(prev => [vep, ...prev]), []);
-  const onCategoriaChange = React.useCallback((cat) => setTweak('categoria', cat), [setTweak]);
-  const onPerfilUpdate = React.useCallback((updates) => {
-    if (updates.nombre)    setTweak('userName', updates.nombre);
-    if (updates.categoria) setTweak('categoria', updates.categoria);
-    if (updates.estudio)   setTweak('estudio', updates.estudio);
-  }, [setTweak]);
+  const addVep     = React.useCallback((vep) => setVeps(prev => [vep, ...prev]), []);
+  const onCategoriaChange = React.useCallback((cat) => setCategoria(cat), []);
+  const onPerfilUpdate    = React.useCallback((updates) => {
+    if (updates.nombre)    setUserName(updates.nombre);
+    if (updates.categoria) setCategoria(updates.categoria);
+    if (updates.estudio)   setEstudio(updates.estudio);
+  }, []);
 
   const renderScreen = () => {
-    const p = { navigate, userName, cuit, categoria, estudio, invoices, addInvoice, veps, addVep, onCategoriaChange, onPerfilUpdate, loadingData };
+    const p = { navigate, userName, cuit, categoria, estudio, invoices, addInvoice, veps, addVep,
+                onCategoriaChange, onPerfilUpdate, loadingData, token };
     switch (screen) {
       case 'dashboard':        return <WebDashboard {...p} />;
       case 'factura':          return <WebFactura {...p} />;
@@ -135,7 +131,7 @@ function App() {
     <>
       <div style={{ height: '100vh', display: 'flex', overflow: 'hidden' }}>
         {isDesktop && (
-          <Sidebar active={screen} onNavigate={navigate} userName={userName} categoria={categoria} estudio={estudio} />
+          <Sidebar active={screen} onNavigate={navigate} userName={userName} categoria={categoria} estudio={estudio} onLogout={onLogout} />
         )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
           {isDesktop ? (
@@ -151,45 +147,65 @@ function App() {
         </div>
       </div>
 
-      {/* Mobile/tablet sidebar drawer */}
       {!isDesktop && drawerOpen && (
         <div onClick={() => setDrawerOpen(false)} style={{
-          position: 'fixed', inset: 0, zIndex: 300,
-          background: 'rgba(30,38,54,0.5)',
-          display: 'flex',
+          position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(30,38,54,0.5)', display: 'flex',
         }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 280, height: '100%', flexShrink: 0 }}>
-            <Sidebar active={screen} onNavigate={navigate} userName={userName} categoria={categoria} estudio={estudio} />
+            <Sidebar active={screen} onNavigate={navigate} userName={userName} categoria={categoria} estudio={estudio} onLogout={onLogout} />
           </div>
         </div>
       )}
-
-      <TweaksPanel tweaks={tweaks} setTweak={setTweak}>
-        <TweakSection title="Contribuyente">
-          <TweakText id="userName" label="Nombre" value={tweaks.userName} onChange={v => setTweak('userName', v)} />
-          <TweakText id="cuit" label="CUIT" value={tweaks.cuit} onChange={v => setTweak('cuit', v)} />
-          <TweakSelect id="categoria" label="Categoría" value={tweaks.categoria}
-            options={['A','B','C','D','E','F','G'].map(c => ({ label: `Categoría ${c}`, value: c }))}
-            onChange={v => setTweak('categoria', v)} />
-          <TweakText id="estudio" label="Estudio contable" value={tweaks.estudio} onChange={v => setTweak('estudio', v)} />
-        </TweakSection>
-        <TweakSection title="Navegación">
-          <TweakSelect id="screen" label="Ir a sección" value={screen}
-            options={[
-              { label: 'Resumen', value: 'dashboard' },
-              { label: 'Facturación', value: 'factura' },
-              { label: 'Generar VEP', value: 'vep' },
-              { label: 'Vencimientos', value: 'vencimientos' },
-              { label: 'Topes', value: 'topes' },
-              { label: 'Recategorización', value: 'recategorizacion' },
-              { label: 'Mi contador', value: 'derivar' },
-              { label: 'Perfil', value: 'perfil' },
-            ]}
-            onChange={v => setScreen(v)} />
-        </TweakSection>
-      </TweaksPanel>
     </>
   );
+}
+
+// ─── App root ────────────────────────────────────────────────────────────────
+
+function App() {
+  const [session, setSession] = React.useState(() => getStoredSession());
+  const [checking, setChecking] = React.useState(!!getStoredSession());
+
+  // Validate stored token on load
+  React.useEffect(() => {
+    if (!session) return;
+    fetch(`${API_BASE}/auth/me`, { headers: authHeader(session.token) })
+      .then(r => r.ok ? r.json() : null)
+      .then(user => {
+        if (!user) { clearSession(); setSession(null); }
+        else {
+          // Refresh user data in session
+          const updated = { ...session, user: { ...session.user, ...user } };
+          storeSession(updated);
+          setSession(updated);
+        }
+      })
+      .catch(() => { /* network error — keep session, will fail on next API call */ })
+      .finally(() => setChecking(false));
+  }, []);
+
+  const handleLogin = (data) => {
+    const s = { token: data.token, user: data.user };
+    storeSession(s);
+    setSession(s);
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    setSession(null);
+  };
+
+  if (checking) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#1E2636', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, color: '#fff' }}>AreaGo</div>
+      </div>
+    );
+  }
+
+  if (!session) return <LoginScreen onLogin={handleLogin} />;
+  if (session.user?.isAdmin) return <AdminPanel token={session.token} adminUser={session.user} onLogout={handleLogout} />;
+  return <ClientApp session={session} onLogout={handleLogout} />;
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

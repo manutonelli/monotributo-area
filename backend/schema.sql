@@ -66,6 +66,16 @@ create table if not exists pagos_monotributo (
   unique(cuit, periodo)
 );
 
+-- Usuarios (vincula auth.users con CUIT y rol)
+create table if not exists usuarios (
+  id uuid primary key references auth.users(id) on delete cascade,
+  cuit text references clientes(cuit) on delete set null,
+  is_admin boolean default false,
+  created_at timestamptz default now()
+);
+
+create index if not exists usuarios_cuit_idx on usuarios(cuit);
+
 -- Seed de demo (reemplazar CUIT con el real del cliente)
 -- insert into clientes (cuit, nombre, categoria, estudio, email, domicilio)
 -- values ('27345678901', 'María García', 'C', 'Estudio Contable XYZ', 'maria@email.com', 'Av. Corrientes 1234, CABA');
